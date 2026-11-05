@@ -1,0 +1,2 @@
+<!-- 仅编译消费端 API，不启动 Activity，也不替代现有可运行 sample。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

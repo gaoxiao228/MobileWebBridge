@@ -1,0 +1,55 @@
+{
+  "name": "mobile-web-bridge",
+  "version": "0.1.1-beta.1",
+  "description": "Mobile Web Bridge JavaScript SDK",
+  "author": "gaoxiao228",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gaoxiao228/MobileWebBridge.git",
+    "directory": "MWB-JS"
+  },
+  "homepage": "https://github.com/gaoxiao228/MobileWebBridge#readme",
+  "bugs": {
+    "url": "https://github.com/gaoxiao228/MobileWebBridge/issues"
+  },
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./browser": "./dist/mwb.iife.js"
+  },
+  "files": [
+    "dist/index.js",
+    "dist/mwb.iife.js",
+    "dist/**/*.d.ts",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs",
+    "prepack": "node scripts/prepack.mjs",
+    "release": "node scripts/release.mjs",
+    "build:composition": "node scripts/build-composition.mjs"
+  },
+  "dependencies": {
+    "dsbridge": "3.1.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

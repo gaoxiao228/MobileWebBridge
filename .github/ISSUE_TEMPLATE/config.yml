@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安全问题说明
+    url: https://github.com/gaoxiao228/MobileWebBridge/blob/main/SECURITY.md
+    about: 敏感信息不进入公开 Issue；先确认仓库私密报告渠道已可用。

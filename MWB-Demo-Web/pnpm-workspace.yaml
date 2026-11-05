@@ -1,0 +1,6 @@
+packages:
+  - .
+
+# Vite 的构建器需要运行其官方二进制安装脚本。
+allowBuilds:
+  esbuild: true

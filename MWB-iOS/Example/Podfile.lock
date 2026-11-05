@@ -1,0 +1,16 @@
+PODS:
+  - MobileWebBridge (0.1.0)
+
+DEPENDENCIES:
+  - MobileWebBridge (from `..`)
+
+EXTERNAL SOURCES:
+  MobileWebBridge:
+    :path: ".."
+
+SPEC CHECKSUMS:
+  MobileWebBridge: 08ee209b1d0d0f7d530e8916e8e7047e5e409b43
+
+PODFILE CHECKSUM: 8cc3d7b8f6646509dfdc9546f39d9d0efaf127ef
+
+COCOAPODS: 1.16.2

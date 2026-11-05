@@ -1,0 +1,34 @@
+name: 问题反馈
+description: 提供可复现的问题和平台信息；安全漏洞请使用私密渠道。
+body:
+  - type: markdown
+    attributes:
+      value: 请勿填写密钥、证书、设备标识、用户数据或漏洞利用细节。安全问题请先阅读 SECURITY.md。
+  - type: input
+    id: versions
+    attributes:
+      label: SDK 与原生版本
+      description: JS 版本、iOS/Android 版本或源码提交 SHA。
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 机型、系统、WebView 版本、Debug/Release，以及相关构建工具版本。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 最小复现步骤
+      description: 前置条件、示例代码或最小工程、操作步骤；移除内部地址与凭据。
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 预期与实际结果
+      description: 可附已脱敏的日志、错误码和截图。
+    validations:
+      required: true

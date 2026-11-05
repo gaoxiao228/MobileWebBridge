@@ -1,0 +1,130 @@
+// !$*UTF8*$!
+// 独立消费宿主的最小工程；不引用 Example、现成 Pods、开发团队或本机 SDK 的绝对路径。
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 56;
+    objects = {
+        000000000000000000000001 = {
+            isa = PBXProject;
+            buildConfigurationList = 000000000000000000000010;
+            compatibilityVersion = "Xcode 14.0";
+            developmentRegion = en;
+            hasScannedForEncodings = 0;
+            knownRegions = (en, Base);
+            mainGroup = 000000000000000000000002;
+            productRefGroup = 000000000000000000000003;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (000000000000000000000004);
+        };
+        000000000000000000000002 = {
+            isa = PBXGroup;
+            children = (000000000000000000000005, 000000000000000000000003);
+            sourceTree = "<group>";
+        };
+        000000000000000000000003 = {
+            isa = PBXGroup;
+            children = (000000000000000000000006);
+            name = Products;
+            sourceTree = "<group>";
+        };
+        000000000000000000000004 = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 000000000000000000000011;
+            buildPhases = (000000000000000000000008, 000000000000000000000009, 00000000000000000000000A);
+            buildRules = ();
+            dependencies = ();
+            name = MWBConsumer;
+            productName = MWBConsumer;
+            productReference = 000000000000000000000006;
+            productType = "com.apple.product-type.application";
+        };
+        000000000000000000000005 = {
+            isa = PBXFileReference;
+            lastKnownFileType = sourcecode.swift;
+            path = AppDelegate.swift;
+            sourceTree = "<group>";
+        };
+        000000000000000000000006 = {
+            isa = PBXFileReference;
+            explicitFileType = wrapper.application;
+            path = MWBConsumer.app;
+            sourceTree = BUILT_PRODUCTS_DIR;
+        };
+        000000000000000000000007 = {isa = PBXBuildFile; fileRef = 000000000000000000000005; };
+        000000000000000000000008 = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (000000000000000000000007);
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        000000000000000000000009 = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = ();
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        00000000000000000000000A = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = ();
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        000000000000000000000010 = {
+            isa = XCConfigurationList;
+            buildConfigurations = (000000000000000000000012, 000000000000000000000013);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        000000000000000000000011 = {
+            isa = XCConfigurationList;
+            buildConfigurations = (000000000000000000000014, 000000000000000000000015);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        000000000000000000000012 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CLANG_ENABLE_MODULES = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+                SDKROOT = iphoneos;
+                SWIFT_VERSION = 5.0;
+            };
+            name = Debug;
+        };
+        000000000000000000000013 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CLANG_ENABLE_MODULES = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+                SDKROOT = iphoneos;
+                SWIFT_VERSION = 5.0;
+            };
+            name = Release;
+        };
+        000000000000000000000014 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                GENERATE_INFOPLIST_FILE = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = com.mobilewebbridge.consumer;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Debug;
+        };
+        000000000000000000000015 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                GENERATE_INFOPLIST_FILE = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = com.mobilewebbridge.consumer;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SWIFT_OPTIMIZATION_LEVEL = "-O";
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Release;
+        };
+    };
+    rootObject = 000000000000000000000001;
+}

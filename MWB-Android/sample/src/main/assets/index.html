@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#eef4f8">
+  <title>MWB 移动端方法示例</title>
+  <link rel="stylesheet" href="./styles.css">
+  <!-- Vue 与运行时均已打成普通脚本，适合 iOS Bundle 和 Android Assets 的本地网页。 -->
+  <script src="./mwb.iife.js"></script>
+  <script>
+    // SDK 脚本刚加载完就探测原生调用，避免把后续 Vue 启动时间算进 MWB 可用时间。
+    try {
+      if (window.mwb && (window._dsbridge || window._dswk || navigator.userAgent.includes('_dsbridge'))) {
+        window.__mwbDemoDeviceInfo = window.mwb.getDeviceInfoSync();
+        window.__mwbDemoBridgeAt = Date.now();
+      }
+    } catch (_) {
+      // 桥若暂未就绪，Vue 挂载后会再尝试一次。
+    }
+  </script>
+  <script defer src="./demo.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <noscript>此示例需要启用 JavaScript。</noscript>
+</body>
+</html>

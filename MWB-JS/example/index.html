@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MWB Bridge Demo</title>
+  <script src="../dist/mwb.iife.js"></script>
+</head>
+<body>
+  <h1>Mobile Web Bridge</h1>
+  <button id="app-info">读取应用信息</button>
+  <pre id="output"></pre>
+  <script>
+    // 这个页面可由 MWB 原生示例加载，展示 H5 调用同步原生能力。
+    document.getElementById("app-info").addEventListener("click", () => {
+      try {
+        document.getElementById("output").textContent = JSON.stringify(mwb.getAppInfoSync(), null, 2);
+      } catch (error) {
+        document.getElementById("output").textContent = String(error);
+      }
+    });
+  </script>
+</body>
+</html>

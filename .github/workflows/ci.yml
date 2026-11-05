@@ -1,0 +1,89 @@
+name: Build and integration checks
+
+# 只验证源码与消费流程；不上传 npm、Pod、Maven，也不创建发布 Tag。
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js-and-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: |
+            MWB-JS/pnpm-lock.yaml
+            MWB-Demo-Web/pnpm-lock.yaml
+      - run: pnpm --dir MWB-JS install --frozen-lockfile
+      - run: pnpm --dir MWB-Demo-Web install --frozen-lockfile
+      - run: npm --prefix MWB-JS run typecheck
+      - run: npm --prefix MWB-JS test
+      - run: npm --prefix MWB-Demo-Web test
+      - run: node --test test/export-source.test.mjs
+      - run: node scripts/check-js-consumer.mjs
+      - run: npm --prefix MWB-Demo-Web run build
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # 发布脚本使用隔离替身测试，不读取 Token、不签名、不上传。
+      - run: python3 -m unittest discover -s test -p test_android_release.py -v
+      - uses: android-actions/setup-android@v3
+        with:
+          # 显式指定安装包，避免默认请求已不可用的旧版 tools。
+          packages: 'platform-tools'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: ./MWB-Android/gradlew -p MWB-Android :mwb:testDebugUnitTest :sample:testDebugUnitTest :sample:assembleRelease --console=plain
+      - run: python3 scripts/check-android-consumer.py
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # 使用 runner 自带的 CocoaPods/Xcode；打印版本便于追踪兼容性。
+      - run: xcodebuild -version && pod --version
+      - run: pod ipc spec MobileWebBridge.podspec > /tmp/mwb-root-podspec.json
+      - run: pod ipc spec MWB-iOS/MobileWebBridge.podspec > /tmp/mwb-ios-podspec.json
+      - run: ./MWB-iOS/Tests/PluginContract/run.sh
+      - run: node scripts/check-ios-consumer.mjs
+      # 各端共用仓库发布 Tag；本轮包含匹配版本的 Pod 时再检查远程源码。
+      - name: Validate Pod source from shared release tag
+        if: github.ref_type == 'tag'
+        env:
+          MWB_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          POD_VERSION="$(ruby -rjson -e 'puts JSON.parse(File.read("/tmp/mwb-root-podspec.json"))["version"]')"
+          if [ "$MWB_RELEASE_TAG" = "$POD_VERSION" ]; then
+            pod spec lint MobileWebBridge.podspec --verbose
+          else
+            echo "Skipping remote Pod lint: no new Pod version matches this shared release tag."
+          fi
