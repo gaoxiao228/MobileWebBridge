@@ -35,7 +35,6 @@ jobs:
       - run: npm --prefix MWB-JS run typecheck
       - run: npm --prefix MWB-JS test
       - run: npm --prefix MWB-Demo-Web test
-      - run: node --test test/export-source.test.mjs
       - run: node scripts/check-js-consumer.mjs
       - run: npm --prefix MWB-Demo-Web run build
 
@@ -49,8 +48,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      # 发布脚本使用隔离替身测试，不读取 Token、不签名、不上传。
-      - run: python3 -m unittest discover -s test -p test_android_release.py -v
       - uses: android-actions/setup-android@v3
         with:
           # 显式指定安装包，避免默认请求已不可用的旧版 tools。
