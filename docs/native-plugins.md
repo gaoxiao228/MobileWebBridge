@@ -266,8 +266,8 @@ Sample 网络仅允许 HTTPS example.com/httpbin.org、默认 443、GET/POST、�
 
 内部协议为 1。缺旧壳网关/协议不兼容 `-1106`；缺插件 `-1100`；缺方法 `-1101`；非法参数/JSON `-1102`；超时 `-1103`；文档失效 `-1104`；配置/执行异常 `-1105`；不可信 `-1006`。业务错误建议用正整数。旧页已销毁时，不承诺旧 JS 还能观察到拒绝，但不会向新文档投递。
 
-JS 预览版 `0.1.1-beta.1` 已发布 npm；原生当前版本 `0.1.0`，Pod Specs 和公共 Maven 尚未发布。当前验证覆盖 JS/H5 集成、Android Robolectric 与 R8 产物、iOS macOS 原生检查和 generic iOS 编译，并新增框架外的独立消费检查。真机 WebView/外网/前后台仍需按本版本验收；版本组合及支持边界见 [版本说明](versioning.md)。
+JS 预览版 `0.1.1-beta.1` 已发布 npm；Android `0.1.1` 已发布 Maven Central；iOS Pod 版本为 `0.1.0`，支持当前源码接入，未发布公共 CocoaPods Specs。当前验证覆盖 JS/H5 集成、Android Robolectric 与 R8 产物、iOS macOS 原生检查和 generic iOS 编译，并新增框架外的独立消费检查。真机 WebView/外网/前后台仍需按本版本验收；版本组合及支持边界见 [版本说明](versioning.md)。
 
 ## 内置首屏通知
 
-当前源码的 `mwb.basic.notifyPageReady()` 复用文档网关的内置分发，不是宿主注册的业务插件，也不需要 defineNativePlugin。其余 basic 方法继续使用既有入口。此能力尚未包含在已发布 JS `0.1.1-beta.1` 与原生 `0.1.0` 中，接入时须同步使用包含本能力的源码；详见 [加载状态与首屏就绪](page-lifecycle.md)。
+当前源码的 `mwb.basic.notifyPageReady()` 复用文档网关的内置分发，不是宿主注册的业务插件，也不需要 defineNativePlugin。其余 basic 方法继续使用既有入口。Android Maven `0.1.1` 已包含原生端支持；H5 须使用当前 JS 源码，iOS 须使用当前原生源码，已发布的 JS `0.1.1-beta.1` 和旧原生 `0.1.0` 不包含此能力；详见 [加载状态与首屏就绪](page-lifecycle.md)。

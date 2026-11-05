@@ -40,7 +40,7 @@ iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写
 
 当前源码支持每个容器独立配置 `onLoadStateChange`、`onPageReady` 并读取 `isPageReady`；iOS 也支持在子类中重写 `pageDidBecomeReady()`。H5 在首屏准备好后调用 `await mwb.basic.notifyPageReady()`。WebView 加载完成与 H5 首屏就绪是两个独立信号。
 
-此能力尚未包含在已发布 JS `0.1.1-beta.1` 与原生 `0.1.0` 中，须同时使用包含该能力的 JS 和原生源码。双端注册时机、H5 用法和重载边界见 [容器加载状态与首屏就绪](docs/page-lifecycle.md)。
+Android Maven `0.1.1` 已包含原生端支持；H5 仍需使用包含该能力的 JS 源码，iOS 需使用当前原生源码。已发布的 JS `0.1.1-beta.1` 和旧原生 `0.1.0` 不包含此能力。双端注册时机、H5 用法和重载边界见 [容器加载状态与首屏就绪](docs/page-lifecycle.md)。
 
 ## 接入前准备
 
@@ -50,7 +50,7 @@ iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写
 | iOS | macOS、Xcode、CocoaPods；iOS 15+、Swift 5.9+；通过 Git Tag 或本地 Pod 接入 |
 | Android | Android Studio / Android SDK 35、JDK 17；最低 API 24；通过 Maven Central 或本地 `mwb` 模块接入 |
 
-正式仓库为 [gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。JS SDK 使用 npm 包 `mobile-web-bridge@0.1.1-beta.1`；Android 使用 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.0`；iOS `0.1.0` 通过 Git Tag 或本地 Pod 安装。
+正式仓库为 [gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。JS SDK 使用 npm 包 `mobile-web-bridge@0.1.1-beta.1`；Android 使用 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.1`；iOS `0.1.0` 通过 Git Tag 或本地 Pod 安装。
 
 当前 npm 的 `latest` 和 `next` 均指向 Beta，尚无稳定版。建议显式安装版本，完整支持范围与升级约定见 [版本兼容说明](docs/versioning.md)。文中的 `/absolute/path/to/MobileJSBridge` 请替换为实际克隆路径。
 
@@ -230,7 +230,7 @@ final class HomeViewController: UIViewController {
 
 ### 1. 添加 Maven 依赖
 
-Maven 坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.0`。在宿主工程中添加仓库和依赖，再继续下方的宿主初始化与页面打开步骤，无需克隆本仓库。
+Maven 坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.1`。在宿主工程中添加仓库和依赖，再继续下方的宿主初始化与页面打开步骤，无需克隆本仓库。
 
 在宿主根目录的 `settings.gradle.kts` 中配置依赖仓库；已有配置时补齐缺少的仓库即可：
 
@@ -250,11 +250,11 @@ dependencyResolutionManagement {
 ```kotlin
 dependencies {
     // 固定版本；同时带入 Manifest、资源、consumer 混淆规则及传递依赖。
-    implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.0")
+    implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.1")
 }
 ```
 
-使用 Groovy DSL 的工程可在 `app/build.gradle` 的 `dependencies { ... }` 中写 `implementation 'io.github.gaoxiao228:mobile-web-bridge:0.1.0'`，仓库同样配置 `google()` 与 `mavenCentral()`。
+使用 Groovy DSL 的工程可在 `app/build.gradle` 的 `dependencies { ... }` 中写 `implementation 'io.github.gaoxiao228:mobile-web-bridge:0.1.1'`，仓库同样配置 `google()` 与 `mavenCentral()`。
 
 同步 Gradle 后构建 App。宿主的 minSdk 至少为 24，构建环境使用 JDK 17；本仓库示例使用 compileSdk `35`、AGP `8.9.2`、Kotlin `2.0.21`、Gradle `8.11.1`。Maven 制品会声明 Kotlin、AppCompat 和 Google Code Scanner 等传递依赖，通常无需手动复制 AAR 或额外引入 DSBridge。扫码能力需要设备具备 Google Play 服务，完整能力差异见 [兼容表](docs/compatibility.md)。
 

@@ -2,7 +2,7 @@
 
 Kotlin 编写的 Android Web 容器，最低 API 24。`mwb` 是可供宿主依赖的 Android library，`sample` 是本地网页示例。底层固定使用 [DSBridge Android 3.0.0](https://github.com/wendux/DSBridge-Android/tree/3.0.0) 的三个 Java 源文件（提交 `d3e5ebc6ca8170f97e420f2f482680c8e149b471`）；做了 AndroidX、Android 35 兼容、安全设置及主线程导航分发优化。
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。`io.github.gaoxiao228:mobile-web-bridge:0.1.0` 已于 2026-11-04 经维护者确认在 Central Portal 为 PUBLISHED；本机公共仓库独立消费验证仍待完成。原生默认版本 `0.1.0`，配合 JS `0.1.1-beta.1`、插件协议 1。源码 library 模块接入仍可使用。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。Android `0.1.1` 已发布到 Maven Central，坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.1`。现有 basic 与插件接口可配合 JS `0.1.1-beta.1`、插件协议 1 使用；加载与首屏就绪能力需搭配当前 JS 源码。也支持源码 library 模块接入。
 
 构建将完整许可放入 AAR 的 classes.jar（META-INF/mobile-web-bridge/）；Sample assets 同时带网页/Vue/DSBridge声明，详见 THIRD_PARTY_NOTICES.md。
 
@@ -48,15 +48,12 @@ Android 导航栏标题始终按整条栏居中；返回控件显示左箭头，
 
 ## Maven 制品与独立接入
 
-Android 与 iOS、JS、Demo 共用一个仓库发布 Tag（例如 `0.1.0`），不单独创建 Android 平台 Tag。Git Tag 固定源码提交，Maven 版本由本次发布的版本表确定，详见 [共享 Tag 约定](../docs/versioning.md#多端共享-git-tag)。
+Android 与 iOS、JS、Demo 共用一个仓库发布 Tag（例如 `0.1.1`），不单独创建 Android 平台 Tag。Git Tag 固定源码提交，Maven 版本由本次发布的版本表确定，详见 [共享 Tag 约定](../docs/versioning.md#多端共享-git-tag)。
 
-公开坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.0`。公共制品可下载后，在消费工程配置 `google()`、`mavenCentral()`，然后添加该坐标；使用者不需要维护者的 Token 或 GPG 密钥。本地联调也可以继续使用以下文件仓库流程。
+公开坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.1`。在消费工程配置 `google()`、`mavenCentral()`，然后添加该坐标；本地联调也可以继续使用以下文件仓库流程。
 
 ```bash
-# 当前目录：仅写入本机 build/maven-repository，不上传远程。
-./gradlew :mwb:publishReleasePublicationToLocalIntegrationRepository
-
-# 生成其他候选版本时，显式传入版本号。
+# 当前目录：显式指定本地构建版本，仅写入 build/maven-repository。
 ./gradlew :mwb:publishReleasePublicationToLocalIntegrationRepository -PmwbVersion=0.1.1
 ```
 
@@ -70,7 +67,7 @@ repositories {
     mavenCentral()
 }
 // app/build.gradle.kts
-dependencies { implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.0") }
+dependencies { implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.1") }
 ```
 
 在源码根目录执行 `python3 scripts/check-android-consumer.py`，自动检查 AAR/许可/sources/POM，并让独立工程仅通过坐标和 POM 编译公开 API，避免 project 依赖掩盖分发问题。脚本可加 `--offline`，此时需要依赖已缓存；它不安装或运行设备。
@@ -135,7 +132,7 @@ Sample release 开启消费端 R8，可检查 `sample/build/outputs/mapping/rele
 
 ## 加载状态与首屏就绪
 
-当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。已发布的 JS `0.1.1-beta.1` 与原生 `0.1.0` 不包含此能力；须同时接入含本能力的 JS 与原生源码。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
+当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。Maven `0.1.1` 已包含原生端支持；已发布的 JS `0.1.1-beta.1` 不包含首屏通知方法，H5 须使用当前 JS 源码。旧 Android `0.1.0` 不支持此能力。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
 
 Android 在子类的 `super.onCreate` 前安装回调，并让宿主 Manifest/Intent 指向该子类；失败原因通过 `loadError` 读取。
 

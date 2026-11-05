@@ -39,7 +39,7 @@ await mwb.setNavigationBarTheme({
 
 当前源码新增 `await mwb.basic.notifyPageReady()`（也可用根入口 `mwb.notifyPageReady()`），用于 H5 主动通知当前原生容器首屏准备完成。无需注册业务插件，重复调用幂等。成功表示原生接受通知，不代表宿主已完成展示。
 
-已发布的 JS `0.1.1-beta.1` 和原生 `0.1.0` 不包含此能力，须同步接入包含本能力的双端源码。此方法走文档身份网关，等待上限 30000ms；旧原生和普通浏览器明确失败。调用时机、原生回调和重载规则见 [接入说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/page-lifecycle.md)。
+已发布的 JS `0.1.1-beta.1` 不包含此能力，H5 须使用当前 JS 源码，并搭配 Android Maven `0.1.1` 或当前 iOS 源码；旧原生 `0.1.0` 不支持此能力。此方法走文档身份网关，等待上限 30000ms；旧原生和普通浏览器明确失败。调用时机、原生回调和重载规则见 [接入说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/page-lifecycle.md)。
 
 ## 同步与异步调用
 
