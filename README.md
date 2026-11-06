@@ -2,7 +2,7 @@
 
 Mobile Web Bridge 是一套基于 DSBridge 的移动端 Web 容器与 JavaScript SDK，帮助开发者在自己的 iOS、Android App 中快速接入 H5 页面，并让 H5 使用原生能力。
 
-当前版本为 **0.1.2**，JS、iOS、Android 与 Demo 共用源码 Tag `0.1.2`，包含 HTML 错误页和默认 `allowedOrigins: ["*"]`。本文安装示例统一使用 `0.1.2`；本轮 npm/Maven 制品尚未发布，当前可使用源码构建、iOS Git Pod 或本地模块接入，分发状态见 [版本说明](docs/versioning.md)。
+当前版本为 **0.1.3**，JS、iOS、Android 与 Demo 共用源码 Tag `0.1.3`，包含 HTML 错误页和默认 `allowedOrigins: ["*"]`。本文安装示例统一使用 `0.1.3`，支持 npm/Maven、源码构建、iOS Git Pod 与本地模块接入，分发状态见 [版本说明](docs/versioning.md)。
 
 iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写的 `MWBActivity`，H5 使用统一的 TypeScript/JavaScript API。接入方可以复用现有容器和基础能力，也可以把自己的网络、账号、支付等 App 逻辑封装成原生插件，组合到 JS SDK 中供页面调用。
 
@@ -42,11 +42,11 @@ iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写
 
 当前源码支持每个容器独立配置 `onLoadStateChange`、`onPageReady` 并读取 `isPageReady`；iOS 也支持在子类中重写 `pageDidBecomeReady()`。H5 在首屏准备好后调用 `await mwb.basic.notifyPageReady()`。WebView 加载完成与 H5 首屏就绪是两个独立信号。
 
-JS、iOS 与 Android 请配套使用 `0.1.2`，以获得完整的加载状态与首屏就绪能力。双端注册时机、H5 用法和重载边界见 [容器加载状态与首屏就绪](docs/page-lifecycle.md)。
+JS、iOS 与 Android 请配套使用 `0.1.3`，以获得完整的加载状态与首屏就绪能力。双端注册时机、H5 用法和重载边界见 [容器加载状态与首屏就绪](docs/page-lifecycle.md)。
 
 ## 接入前准备
 
-当前源码还内置可离线使用的 HTML 错误页，支持重新加载、业务首页回调，以及接入方完整替换本地 HTML/CSS。该能力随 `0.1.2` 源码提供，接入方式见 [错误页与自定义模板](docs/error-pages.md)。
+当前源码还内置可离线使用的 HTML 错误页，支持重新加载、业务首页回调，以及接入方完整替换本地 HTML/CSS。该能力随 `0.1.3` 源码提供，接入方式见 [错误页与自定义模板](docs/error-pages.md)。
 
 | 端 | 环境与接入方式 |
 | --- | --- |
@@ -54,9 +54,9 @@ JS、iOS 与 Android 请配套使用 `0.1.2`，以获得完整的加载状态与
 | iOS | macOS、Xcode、CocoaPods；iOS 15+、Swift 5.9+；通过 Git Tag 或本地 Pod 接入 |
 | Android | Android Studio / Android SDK 35、JDK 17；最低 API 24；通过 Maven Central 或本地 `mwb` 模块接入 |
 
-正式仓库为 [gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。本轮 JS SDK 使用 npm 包版本 `mobile-web-bridge@0.1.2`；Android 使用 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.2`；iOS `0.1.2` 通过同名 Git Tag 或本地 Pod 安装。npm/Maven 安装须待对应制品发布后使用。
+正式仓库为 [gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。本轮 JS SDK 使用 npm 包版本 `mobile-web-bridge@0.1.3`；Android 使用 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.3`；iOS `0.1.3` 通过同名 Git Tag 或本地 Pod 安装。各端分发状态见版本说明。
 
-建议显式固定 `0.1.2`，不要依赖 npm 分发标签推断源码版本。完整支持范围与升级约定见 [版本兼容说明](docs/versioning.md)。文中的 `/absolute/path/to/MobileJSBridge` 请替换为实际克隆路径。
+建议显式固定 `0.1.3`，不要依赖 npm 分发标签推断源码版本。完整支持范围与升级约定见 [版本兼容说明](docs/versioning.md)。文中的 `/absolute/path/to/MobileJSBridge` 请替换为实际克隆路径。
 
 当前为预览阶段，版本变更见 [CHANGELOG](CHANGELOG.md)。
 
@@ -102,11 +102,11 @@ async function selectPhoto() {
 
 ### 从 npm 安装
 
-以下命令用于安装 npm `0.1.2`，须待该版本发布后执行；当前请使用下方的源码构建与本地安装方式：
+在接入方的 H5 工程固定安装 npm `0.1.3`；需要自定义构建时可使用下方的源码安装方式：
 
 ```bash
-# 固定本轮版本，待 npm 制品发布后使用。
-npm install mobile-web-bridge@0.1.2
+# 固定本轮项目版本，避免依赖分发标签变化。
+npm install mobile-web-bridge@0.1.3
 ```
 
 安装 JS 包不会自动安装原生容器，仍需完成下文 iOS/Android 接入。
@@ -175,12 +175,12 @@ async function showMessage() {
 
 ### 1. 通过 CocoaPods 接入
 
-在宿主 App 的 Podfile 对应 target 中加入，固定使用源码 Tag `0.1.2`：
+在宿主 App 的 Podfile 对应 target 中加入，固定使用源码 Tag `0.1.3`：
 
 ```ruby
 # 从 Git Tag 安装指定版本。
 platform :ios, '15.0'
-pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.2'
+pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.3'
 ```
 
 iOS 暂不提供公共 CocoaPods Specs 安装。需要自定义原生实现时，也可将上面的 Git 依赖替换为本地源码依赖：
@@ -204,8 +204,8 @@ import MobileWebBridge
 // 宿主按需提供应用信息；未配置的专属能力会返回明确错误。
 final class AppBridgeHost: MWBHostDelegate {
     func appInfo() -> [String: Any]? {
-        ["appId": "my-app", "appVersionName": "0.1.2",
-         "appVersionCode": 1, "environment": 2]
+        ["appId": "my-app", "appVersionName": "0.1.3",
+         "appVersionCode": 3, "environment": 2]
     }
 }
 
@@ -234,7 +234,7 @@ final class HomeViewController: UIViewController {
 
 ### 1. 添加 Maven 依赖
 
-本轮 Maven 坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.2`，须待 Maven Central 制品发布后使用。发布后在宿主工程添加以下仓库和依赖即可；当前请使用本节后面的本地 library 模块方式，或按 [Android README](MWB-Android/README.md#maven-制品与独立接入) 构建本地 Maven 制品。
+本轮 Maven 坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.3`，在宿主工程添加以下仓库和依赖。需要修改源码或离线联调时，可使用本节后面的本地 library 模块方式，或按 [Android README](MWB-Android/README.md#maven-制品与独立接入) 构建本地 Maven 制品。
 
 在宿主根目录的 `settings.gradle.kts` 中配置依赖仓库；已有配置时补齐缺少的仓库即可：
 
@@ -254,11 +254,11 @@ dependencyResolutionManagement {
 ```kotlin
 dependencies {
     // 固定版本；同时带入 Manifest、资源、consumer 混淆规则及传递依赖。
-    implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.2")
+    implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.3")
 }
 ```
 
-使用 Groovy DSL 的工程可在 `app/build.gradle` 的 `dependencies { ... }` 中写 `implementation 'io.github.gaoxiao228:mobile-web-bridge:0.1.2'`，仓库同样配置 `google()` 与 `mavenCentral()`。
+使用 Groovy DSL 的工程可在 `app/build.gradle` 的 `dependencies { ... }` 中写 `implementation 'io.github.gaoxiao228:mobile-web-bridge:0.1.3'`，仓库同样配置 `google()` 与 `mavenCentral()`。
 
 同步 Gradle 后构建 App。宿主的 minSdk 至少为 24，构建环境使用 JDK 17；本仓库示例使用 compileSdk `35`、AGP `8.9.2`、Kotlin `2.0.21`、Gradle `8.11.1`。Maven 制品会声明 Kotlin、AppCompat 和 Google Code Scanner 等传递依赖，通常无需手动复制 AAR 或额外引入 DSBridge。扫码能力需要设备具备 Google Play 服务，完整能力差异见 [兼容表](docs/compatibility.md)。
 
@@ -300,8 +300,8 @@ class MyApplication : Application() {
         MWB.install(object : MWBHost {
             override fun appInfo(): JSONObject = JSONObject()
                 .put("appId", packageName)
-                .put("appVersionName", "0.1.2")
-                .put("appVersionCode", 1)
+                .put("appVersionName", "0.1.3")
+                .put("appVersionCode", 3)
                 .put("environment", 2)
         })
     }

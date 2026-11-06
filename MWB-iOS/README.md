@@ -4,18 +4,18 @@ Swift 编写的 Web 容器，底层使用 DSBridge 3.0.6。最低系统版本为
 
 ## 接入
 
-当前源码支持默认本地 HTML 错误页、自定义 Bundle 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.2` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
+当前源码支持默认本地 HTML 错误页、自定义 Bundle 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.3` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本 `0.1.2`，配合本轮 JS/Android `0.1.2` 源码和插件协议 1；通过共享 Tag `0.1.2` 或本地 Pod 接入，暂不提供公共 CocoaPods Specs 安装。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本 `0.1.3`，配合本轮 JS/Android `0.1.3` 源码和插件协议 1；通过共享 Tag `0.1.3` 或本地 Pod 接入，暂不提供公共 CocoaPods Specs 安装。
 
 仓库根目录提供单仓库 Podspec。使用 Git 接入时固定源码 Tag：
 
 ```ruby
 # 固定共享源码版本，避免跟随分支变化。
-pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.2'
+pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.3'
 ```
 
-示例中的 Git 接入固定共享 Tag `0.1.2`；该 Tag 标识仓库源码，不代表发布了公共 CocoaPods Specs。需要修改源码或离线开发时，可使用本目录的本地 CocoaPods 接入：
+示例中的 Git 接入固定共享 Tag `0.1.3`；该 Tag 标识仓库源码，不代表发布了公共 CocoaPods Specs。需要修改源码或离线开发时，可使用本目录的本地 CocoaPods 接入：
 
 ```ruby
 pod 'MobileWebBridge', :path => '/absolute/path/to/MWB-iOS'
@@ -124,11 +124,11 @@ xcodebuild -workspace MWBExample.xcworkspace -scheme MWBExample \
   -destination 'generic/platform=iOS' build-for-testing CODE_SIGNING_ALLOWED=NO
 ```
 
-`build-for-testing` 只编译 XCTest，不表示已在设备执行测试；主文档首屏时序、真实 WebView/网络和前后台行为仍需宿主的设备验收。Git Pod 可按共享 Tag `0.1.2` 接入；宿主仍需验证自己的权限及业务域名配置。
+`build-for-testing` 只编译 XCTest，不表示已在设备执行测试；主文档首屏时序、真实 WebView/网络和前后台行为仍需宿主的设备验收。Git Pod 可按共享 Tag `0.1.3` 接入；宿主仍需验证自己的权限及业务域名配置。
 
 ## 加载状态与首屏就绪
 
-当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 iOS、Android 和 JS `0.1.2`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
+当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 iOS、Android 和 JS `0.1.3`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
 
 iOS 在加载视图前注册闭包；也可继承容器并重写 `pageDidBecomeReady()`，无需调用 super。
 

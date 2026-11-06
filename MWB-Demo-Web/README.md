@@ -23,7 +23,7 @@ npm run build
 
 ## 接入 iOS 与 Android 示例
 
-Demo 源码版本为 `0.1.2`，与本轮 JS、iOS 和 Android SDK 配套。
+Demo 源码版本为 `0.1.3`，与本轮 JS、iOS 和 Android SDK 配套。
 
 两端示例都配置了错误页回 Web 首页的回调。需要验证时，可在 `navigateTo` 方法详情中将 `url` 改为同目录下不存在的页面地址，触发默认错误页；自定义模板示例保留在 `src/custom-error/`，构建同步时保留目录结构，可在原生创建容器时通过 `errorPage` 配置使用。首页不展示专门的错误页入口；接入约定见 [错误页与自定义模板](../docs/error-pages.md)。
 

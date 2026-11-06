@@ -2,15 +2,15 @@
 
 MWB 为 iOS 和 Android 的 Web 容器提供统一 JS API。原生通信由 DSBridge 3.x 完成。
 
-当前版本为 `0.1.2`，与同一 Git Tag 下的 iOS/Android 源码配套。本轮 npm 制品尚未发布；下方命令固定为 `0.1.2`，发布前可按 [源码构建与安装](https://github.com/gaoxiao228/MobileWebBridge#从源码构建-js-sdk) 使用。
+当前版本为 `0.1.3`，与同一 Git Tag 下的 iOS/Android 源码配套。下方安装命令固定为 `0.1.3`；分发状态见 [版本说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/versioning.md)，需要本地构建时可按 [源码构建与安装](https://github.com/gaoxiao228/MobileWebBridge#从源码构建-js-sdk) 使用。
 
 正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。建议固定精确版本；Git Tag 与 npm 分发标签独立，原生接入与支持范围见 [项目 README](https://github.com/gaoxiao228/MobileWebBridge#readme)。
 
 ## 安装和使用
 
 ```bash
-# 待 npm 0.1.2 制品发布后使用。
-npm install mobile-web-bridge@0.1.2
+# 固定项目版本；原生端也使用配套版本。
+npm install mobile-web-bridge@0.1.3
 ```
 
 ```ts
@@ -42,7 +42,7 @@ await mwb.setNavigationBarTheme({
 
 当前源码新增 `await mwb.basic.notifyPageReady()`（也可用根入口 `mwb.notifyPageReady()`），用于 H5 主动通知当前原生容器首屏准备完成。无需注册业务插件，重复调用幂等。成功表示原生接受通知，不代表宿主已完成展示。
 
-此能力请配套使用 JS、iOS 和 Android `0.1.2`。此方法走文档身份网关，等待上限 30000ms；旧原生和普通浏览器明确失败。调用时机、原生回调和重载规则见 [接入说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/page-lifecycle.md)。
+此能力请配套使用 JS、iOS 和 Android `0.1.3`。此方法走文档身份网关，等待上限 30000ms；旧原生和普通浏览器明确失败。调用时机、原生回调和重载规则见 [接入说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/page-lifecycle.md)。
 
 ## 同步与异步调用
 
