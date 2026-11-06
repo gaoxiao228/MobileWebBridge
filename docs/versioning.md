@@ -1,19 +1,19 @@
 # 版本、支持范围与升级
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。npm 包：[mobile-web-bridge](https://www.npmjs.com/package/mobile-web-bridge)。npm 状态核实日期为 2026-11-06；Android `0.1.1` 已于 2026-11-05 确认发布，并核实 Maven Central 的 POM/AAR 可下载。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。npm 包：[mobile-web-bridge](https://www.npmjs.com/package/mobile-web-bridge)。npm 与 Maven Central 状态核实日期为 2026-11-06；本轮 `0.1.3` 已公开，并分别通过公共 registry / Maven 仓库的独立消费检查。
 
 ## 当前状态
 
 | 组件 | 当前版本 | 获取方式与状态 |
 | --- | --- | --- |
-| JS SDK | `0.1.3` | 本轮源码；尚未发布 npm |
+| JS SDK | `0.1.3` | 已发布 npm，latest 指向本版本 |
 | iOS | `0.1.3` | 共享源码 Tag / 本地 Pod；未发布公共 CocoaPods Specs |
-| Android | `0.1.3` | 源码/本地 Maven；尚未发布本轮 Maven Central 制品 |
+| Android | `0.1.3` | 已发布 Maven Central；公共坐标独立消费通过 |
 | Demo Web | `0.1.3` | 与本轮 SDK 配套，不是独立发布的 SDK；页面可静态部署 |
 
-`0.1.3` 包含默认与自定义 HTML 错误页、业务首页回调，以及默认 `allowedOrigins` 星号配置。GitHub 共享 Tag 标识源码交付，不代表 npm/Maven 制品已公开发布；此前已确认 npm 稳定版本为 `0.1.2`，Android Maven 为 `0.1.1`；本轮 `0.1.3` 制品将在上传后分别核验。
+`0.1.3` 包含默认与自定义 HTML 错误页、业务首页回调，以及默认 `allowedOrigins` 星号配置。本轮 JS 与 Android 制品均已公开；iOS 通过共享 Tag 或本地 Pod 接入，不提供公共 CocoaPods Specs 安装。Git Tag、npm 与 Maven 是分别核验的分发渠道。
 
-本轮准备时 npm 的 `latest` 指向 `0.1.2`，`next` 指向 `0.1.1-beta.1`；`0.1.3` 的公开状态须在发布后核验。核实实时状态可运行：
+本次核实 npm 的 `latest` 指向 `0.1.3`，`next` 保留 `0.1.1-beta.1`；稳定版接入请固定 `0.1.3`，不要使用旧的预览标签。核实实时状态可运行：
 
 ```bash
 npm view mobile-web-bridge dist-tags versions --json --registry=https://registry.npmjs.org/
@@ -35,10 +35,10 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | 共享 Git Tag | iOS Pod 版本 | Android Maven 版本 | JS npm 版本 | 状态 |
 | --- | --- | --- | --- | --- |
-| `0.1.3` | `0.1.3` | `0.1.3` | `0.1.3` | 本轮 GitHub 共享源码 Tag；npm/Maven 制品尚未发布 |
+| `0.1.3` | `0.1.3` | `0.1.3` | `0.1.3` | GitHub Tag、npm 与 Maven Central 已公开；iOS Git Pod 验证通过 |
 | `0.1.1` | `0.1.0` | `0.1.1` | `0.1.1-beta.1` | Android Maven 已发布，含加载与就绪回调；H5 仍需当前 JS 源码，iOS 未发布公共 Specs |
 
-共享 Tag 是仓库源码标识，各端已发布版本不得覆盖。本轮将源码版本统一为 `0.1.3`，Podspec 的 `s.source[:tag]` 对应共享 Tag `0.1.3`，支持 Git Pod 或本地源码接入。历史 Tag `0.1.2` 将按本轮发布安排移除，npm `0.1.2` 包继续保留；既有共享 Tag `0.1.1` 保留。Maven 坐标中的版本和 npm 包版本按本表记录，不由 Git Tag 自动修改。
+共享 Tag 是仓库源码标识，各端已发布版本不得覆盖。本轮将源码版本统一为 `0.1.3`，Podspec 的 `s.source[:tag]` 对应共享 Tag `0.1.3`，支持 Git Pod 或本地源码接入。历史 Tag `0.1.2` 已移除，npm `0.1.2` 包继续保留；既有共享 Tag `0.1.1` 保留。Maven 坐标中的版本和 npm 包版本按本表记录，不由 Git Tag 自动修改。
 
 npm 的 `latest`、`next` 是包分发标签，与 Git Tag 分开管理，不需要因此再创建 JS 专属的 Git Tag。
 
