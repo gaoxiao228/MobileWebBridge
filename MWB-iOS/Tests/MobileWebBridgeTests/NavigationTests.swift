@@ -3,6 +3,74 @@ import UIKit
 @testable import MobileWebBridge
 
 final class NavigationTests: XCTestCase {
+    func testConfigurationDefaultsToWildcardAndPreservesExplicitRestrictions() throws {
+        // 不传来源时默认放开 HTTP(S)，显式空集合仍可限制为包内页面。
+        let url = try XCTUnwrap(URL(string: "https://example.com/app"))
+        XCTAssertEqual(MWBConfiguration(initialURL: url).allowedOrigins, ["*"])
+        XCTAssertEqual(try XCTUnwrap(MWBConfiguration.make(initialURLString: url.absoluteString)).allowedOrigins, ["*"])
+        XCTAssertTrue(MWBConfiguration(initialURL: url, allowedOrigins: []).allowedOrigins.isEmpty)
+        XCTAssertEqual(MWBConfiguration(initialURL: url, allowedOrigins: ["https://example.com"]).allowedOrigins,
+                       ["https://example.com"])
+    }
+
+    func testWildcardTrustsAllHTTPOriginsIncludingMixedConfiguration() {
+        // 单独的星号允许任意 HTTP(S) 来源，包括后续重定向到的新来源。
+        for origins in [Set(["*"]), Set(["https://app.example.test", "*"])] {
+            let policy = MWBNavigationPolicy(allowedOrigins: origins)
+            for address in ["https://example.com/app", "http://other.example.test/path",
+                            "https://other.example.test:8443/redirect"] {
+                XCTAssertTrue(policy.isTrusted(URL(string: address)!), address)
+            }
+        }
+    }
+
+    func testWildcardPreservesSchemeAndLocalFileBoundaries() {
+        // 星号不能绕过协议限制或已有的包内文件目录边界。
+        let root = Bundle.main.bundleURL
+        let policy = MWBNavigationPolicy(allowedOrigins: ["*"], localRoot: root)
+        XCTAssertTrue(policy.isTrusted(root.appendingPathComponent("index.html")))
+        for address in ["javascript:alert(1)", "data:text/html,hello", "about:blank",
+                        "ftp://example.com/a", "https:/missing-host", "file:///tmp/outside.html"] {
+            XCTAssertFalse(policy.isTrusted(URL(string: address)!), address)
+        }
+        XCTAssertFalse(MWBNavigationPolicy(allowedOrigins: ["*"]).isTrusted(root.appendingPathComponent("index.html")))
+    }
+
+    func testPartialWildcardDoesNotTrustSubdomains() {
+        // 本次仅支持完整的星号，其他配置继续精确比较来源。
+        let policy = MWBNavigationPolicy(allowedOrigins: ["https://*.example.com"])
+        XCTAssertFalse(policy.isTrusted(URL(string: "https://app.example.com")!))
+        XCTAssertFalse(MWBNavigationPolicy(allowedOrigins: []).isTrusted(URL(string: "https://example.com")!))
+    }
+
+    func testMissingLocalPageUnderSymlinkRootCanReachLoadFailure() throws {
+        // iOS 安装路径可能经过符号链接；缺失的包内入口必须进入加载失败，而非被误判越界。
+        let manager = FileManager.default
+        let base = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let root = base.appendingPathComponent("App.app", isDirectory: true)
+        let alias = base.appendingPathComponent("installed-app", isDirectory: true)
+        try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? manager.removeItem(at: base) }
+        try manager.createSymbolicLink(at: alias, withDestinationURL: root)
+        try Data("index".utf8).write(to: root.appendingPathComponent("index.html"))
+        let policy = MWBNavigationPolicy(allowedOrigins: [], localRoot: alias)
+
+        XCTAssertTrue(policy.isTrusted(alias.appendingPathComponent("index.html")))
+        XCTAssertTrue(policy.isTrusted(alias.appendingPathComponent("mwb-missing.html")))
+        XCTAssertTrue(policy.isTrusted(alias.appendingPathComponent("missing/subpage.html")))
+        XCTAssertFalse(policy.isTrusted(base.appendingPathComponent("outside.html")))
+        XCTAssertFalse(policy.isTrusted(alias.appendingPathComponent("../outside.html")))
+
+        // 真实指向包外的链接和目标不存在的链接仍须拒绝，不能为错误示例放宽目录边界。
+        let outside = base.appendingPathComponent("outside", isDirectory: true)
+        try manager.createDirectory(at: outside, withIntermediateDirectories: true)
+        try manager.createSymbolicLink(at: root.appendingPathComponent("escape"), withDestinationURL: outside)
+        try manager.createSymbolicLink(at: root.appendingPathComponent("dangling"),
+            withDestinationURL: outside.appendingPathComponent("absent"))
+        XCTAssertFalse(policy.isTrusted(alias.appendingPathComponent("escape/missing.html")))
+        XCTAssertFalse(policy.isTrusted(alias.appendingPathComponent("dangling/missing.html")))
+    }
+
     func testWebContainerHandlesJavaScriptDialogsBeforeDSBridgeFallback() {
         // DSBridge 的旧版 UIAlertView 在 iOS 27 上崩溃，容器必须接管 JS 对话框。
         let url = Bundle.main.url(forResource: "index", withExtension: "html")!

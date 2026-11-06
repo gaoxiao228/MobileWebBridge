@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>页面暂时无法打开</title>
+  <link rel="stylesheet" href="error.css">
+  <script src="error.js" defer></script>
+</head>
+<body>
+  <!-- 所有资源随 SDK 打包；协议可用前保留禁用状态。 -->
+  <main>
+    <!-- 双层纸页完全使用本地样式绘制，装饰不参与读屏。 -->
+    <div class="document" aria-hidden="true">
+      <div class="sheet-back"></div>
+      <div class="sheet-front">
+        <span class="document-dots"><span></span><span></span><span></span></span>
+        <span class="document-line"></span>
+        <span class="document-line short"></span>
+      </div>
+    </div>
+    <h1>页面暂时无法打开</h1>
+    <p id="message" role="status" aria-live="polite">请稍后重新加载，或返回首页继续使用。</p>
+    <div class="actions">
+      <button id="retry" type="button" disabled>重新加载</button>
+      <button id="home" class="secondary" type="button" hidden>回到首页</button>
+    </div>
+  </main>
+</body>
+</html>

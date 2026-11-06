@@ -6,10 +6,12 @@
 
 | 组件 | 当前版本 | 获取方式与状态 |
 | --- | --- | --- |
-| JS SDK | `0.1.1-beta.1` | 已发布 npm；建议显式安装该版本或 `@next` |
-| iOS | `0.1.0` | 源码/本地 Pod；根 Podspec 已适配单仓库，尚未发布 CocoaPods Specs |
-| Android | `0.1.1` | 已发布 Maven Central，公开 POM/AAR 可下载，也支持源码和本机 Maven |
-| Demo Web | `0.1.0` | 联调示例，不是独立发布的 SDK；页面可静态部署 |
+| JS SDK | `0.1.2` | 本轮源码；尚未发布 npm |
+| iOS | `0.1.2` | 共享源码 Tag / 本地 Pod；未发布公共 CocoaPods Specs |
+| Android | `0.1.2` | 源码/本地 Maven；尚未发布本轮 Maven Central 制品 |
+| Demo Web | `0.1.2` | 与本轮 SDK 配套，不是独立发布的 SDK；页面可静态部署 |
+
+`0.1.2` 包含默认与自定义 HTML 错误页、业务首页回调，以及默认 `allowedOrigins` 星号配置。GitHub 共享 Tag 标识源码交付，不代表 npm/Maven 制品已公开发布；此前确认发布的版本仍为 JS `0.1.1-beta.1`、Android Maven `0.1.1`，iOS 旧源码 Pod 为 `0.1.0`。
 
 本次核实 npm 的 `latest` 与 `next` 都指向 `0.1.1-beta.1`，**尚无稳定版**。直接安装默认标签也会得到 Beta，不能据此推断其已稳定。核实实时状态可运行：
 
@@ -23,9 +25,9 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | H5 SDK | iOS / Android 源码 | 插件协议 | 范围 |
 | --- | --- | --- | --- |
-| `0.1.1-beta.1` | iOS 当前源码（Pod `0.1.0`）/ Android Maven `0.1.1` | `1` | basic、根兼容入口、自定义异步原生插件；首屏通知须使用当前 JS 源码 |
+| `0.1.2` 源码 | iOS / Android `0.1.2` 源码 | `1` | basic、原生插件、首屏通知、默认与自定义错误页、业务首页回调 |
 
-该表描述源码和自动化检查覆盖的组合，不是对所有设备/WebView 的兼容认证。正式对外提供时，应在此补充真实提交 SHA、共享 Tag、仓库地址和设备验收记录。
+该表描述源码和自动化检查覆盖的组合，不是对所有设备/WebView 的兼容认证。本轮源码以正式仓库的共享 Tag `0.1.2` 为准；宿主仍需按目标设备验证实际业务。
 
 ## 多端共享 Git Tag
 
@@ -33,9 +35,10 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | 共享 Git Tag | iOS Pod 版本 | Android Maven 版本 | JS npm 版本 | 状态 |
 | --- | --- | --- | --- | --- |
+| `0.1.2` | `0.1.2` | `0.1.2` | `0.1.2` | 本轮 GitHub 共享源码 Tag；npm/Maven 制品尚未发布 |
 | `0.1.1` | `0.1.0` | `0.1.1` | `0.1.1-beta.1` | Android Maven 已发布，含加载与就绪回调；H5 仍需当前 JS 源码，iOS 未发布公共 Specs |
 
-共享 Tag 是仓库源码标识，各端包版本仍独立管理，已发布版本不得覆盖。重建仓库后移除旧 Tag，当前仅保留 `0.1.1`；Podspec 的 `s.source[:tag]` 显式引用该源码 Tag，Pod 版本仍为 `0.1.0`，本次不发布 CocoaPods Specs。Maven 坐标中的版本和 npm 包版本按本表记录，不由 Git Tag 自动修改。历史 `0.1.0` Git 接入应改用源码 Tag `0.1.1`。
+共享 Tag 是仓库源码标识，各端已发布版本不得覆盖。本轮将源码版本统一为 `0.1.2`，Podspec 的 `s.source[:tag]` 对应共享 Tag `0.1.2`，支持 Git Pod 或本地源码接入。当前既有共享 Tag `0.1.1` 继续保留。Maven 坐标中的版本和 npm 包版本按本表记录，不由 Git Tag 自动修改。
 
 npm 的 `latest`、`next` 是包分发标签，与 Git Tag 分开管理，不需要因此再创建 JS 专属的 Git Tag。
 

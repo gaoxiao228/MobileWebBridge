@@ -1,5 +1,5 @@
 // MWB 的公开契约以用户提供的旧 JS SDK 类型为基准，版本和产品命名已更新。
-export const version = "0.1.1-beta.1";
+export const version = "0.1.2";
 
 type TYPE_VERSION = typeof version;
 

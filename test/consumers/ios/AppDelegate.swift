@@ -20,6 +20,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             initialURL: URL(string: "https://example.com")!,
             allowedOrigins: ["https://example.com"]
         )
+        // 编译覆盖关闭与 Bundle 自定义资源入口；无需访问 SDK 内部类型。
+        _ = MWBConfiguration(initialURL: configuration.initialURL, allowedOrigins: [], errorPage: .init(enabled: false))
+        _ = MWBConfiguration(initialURL: configuration.initialURL, allowedOrigins: [],
+            errorPage: .init(source: .bundled(bundle: .main, directory: "custom-error", entry: "index.html")))
         let controller = ConsumerWebController(configuration: configuration)
         controller.onLoadStateChange = { state in print(state) }
         controller.onPageReady = { [weak controller] in print(controller?.isPageReady == true) }
@@ -33,6 +37,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
 /// 最小宿主实现验证 MWBHostDelegate 的公开协议可以从框架外遵循。
 private final class ConsumerHost: MWBHostDelegate {
+    func configureContainer(_ container: MWBWebViewController) {
+        // 从公开模块安装容器回调，不访问框架内部展示器。
+        container.onGoHome = { current in current.load(current.configuration.initialURL) }
+    }
     func appInfo() -> [String: Any]? { ["appId": "mwb-consumer"] }
 }
 

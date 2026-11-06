@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>自定义错误页示例</title>
+  <link rel="stylesheet" href="error.css">
+  <script src="error.js" defer></script>
+</head>
+<body>
+  <!-- 接入方可以完整替换布局，不依赖 SDK 默认样式或 DOM ID。 -->
+  <main>
+    <h1>稍等一下，<br>我们再试一次。</h1>
+    <p class="description" role="status" aria-live="polite">正在准备恢复操作。</p>
+    <div class="actions">
+      <button class="retry" type="button" disabled>重新加载</button>
+      <button class="home" type="button" hidden>回到首页</button>
+    </div>
+    <small>这是 App 提供的自定义 HTML 页面。</small>
+  </main>
+</body>
+</html>

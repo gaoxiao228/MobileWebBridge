@@ -2,6 +2,8 @@
 
 Mobile Web Bridge 是一套基于 DSBridge 的移动端 Web 容器与 JavaScript SDK，帮助开发者在自己的 iOS、Android App 中快速接入 H5 页面，并让 H5 使用原生能力。
 
+当前版本为 **0.1.2**，JS、iOS、Android 与 Demo 共用源码 Tag `0.1.2`，包含 HTML 错误页和默认 `allowedOrigins: ["*"]`。本文安装示例统一使用 `0.1.2`；本轮 npm/Maven 制品尚未发布，当前可使用源码构建、iOS Git Pod 或本地模块接入，分发状态见 [版本说明](docs/versioning.md)。
+
 iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写的 `MWBActivity`，H5 使用统一的 TypeScript/JavaScript API。接入方可以复用现有容器和基础能力，也可以把自己的网络、账号、支付等 App 逻辑封装成原生插件，组合到 JS SDK 中供页面调用。
 
 ## 适合用来做什么
@@ -24,7 +26,7 @@ iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写
 
 ## 已有能力
 
-当前源码的 `basic` 共 49 个公开方法：30 个既有原生桥入口、1 个通过文档网关调用的首屏就绪方法，以及 18 个 JS 句柄和事件方法。已发布版本仍为原有 48 个方法。
+当前源码的 `basic` 共 49 个公开方法：30 个既有原生桥入口、1 个通过文档网关调用的首屏就绪方法，以及 18 个 JS 句柄和事件方法。
 
 | 能力 | 示例 |
 | --- | --- |
@@ -40,9 +42,11 @@ iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写
 
 当前源码支持每个容器独立配置 `onLoadStateChange`、`onPageReady` 并读取 `isPageReady`；iOS 也支持在子类中重写 `pageDidBecomeReady()`。H5 在首屏准备好后调用 `await mwb.basic.notifyPageReady()`。WebView 加载完成与 H5 首屏就绪是两个独立信号。
 
-Android Maven `0.1.1` 已包含原生端支持；H5 仍需使用包含该能力的 JS 源码，iOS 需使用当前原生源码。已发布的 JS `0.1.1-beta.1` 和旧原生 `0.1.0` 不包含此能力。双端注册时机、H5 用法和重载边界见 [容器加载状态与首屏就绪](docs/page-lifecycle.md)。
+JS、iOS 与 Android 请配套使用 `0.1.2`，以获得完整的加载状态与首屏就绪能力。双端注册时机、H5 用法和重载边界见 [容器加载状态与首屏就绪](docs/page-lifecycle.md)。
 
 ## 接入前准备
+
+当前源码还内置可离线使用的 HTML 错误页，支持重新加载、业务首页回调，以及接入方完整替换本地 HTML/CSS。该能力随 `0.1.2` 源码提供，接入方式见 [错误页与自定义模板](docs/error-pages.md)。
 
 | 端 | 环境与接入方式 |
 | --- | --- |
@@ -50,9 +54,9 @@ Android Maven `0.1.1` 已包含原生端支持；H5 仍需使用包含该能力�
 | iOS | macOS、Xcode、CocoaPods；iOS 15+、Swift 5.9+；通过 Git Tag 或本地 Pod 接入 |
 | Android | Android Studio / Android SDK 35、JDK 17；最低 API 24；通过 Maven Central 或本地 `mwb` 模块接入 |
 
-正式仓库为 [gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。JS SDK 使用 npm 包 `mobile-web-bridge@0.1.1-beta.1`；Android 使用 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.1`；iOS `0.1.0` 通过 Git Tag 或本地 Pod 安装。
+正式仓库为 [gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。本轮 JS SDK 使用 npm 包版本 `mobile-web-bridge@0.1.2`；Android 使用 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.2`；iOS `0.1.2` 通过同名 Git Tag 或本地 Pod 安装。npm/Maven 安装须待对应制品发布后使用。
 
-当前 npm 的 `latest` 和 `next` 均指向 Beta，尚无稳定版。建议显式安装版本，完整支持范围与升级约定见 [版本兼容说明](docs/versioning.md)。文中的 `/absolute/path/to/MobileJSBridge` 请替换为实际克隆路径。
+建议显式固定 `0.1.2`，不要依赖 npm 分发标签推断源码版本。完整支持范围与升级约定见 [版本兼容说明](docs/versioning.md)。文中的 `/absolute/path/to/MobileJSBridge` 请替换为实际克隆路径。
 
 当前为预览阶段，版本变更见 [CHANGELOG](CHANGELOG.md)。
 
@@ -98,11 +102,11 @@ async function selectPhoto() {
 
 ### 从 npm 安装
 
-在接入方的 H5 工程执行：
+以下命令用于安装 npm `0.1.2`，须待该版本发布后执行；当前请使用下方的源码构建与本地安装方式：
 
 ```bash
-# 固定已发布的 Beta；也可用 @next 跟随预览标签。
-npm install mobile-web-bridge@0.1.1-beta.1
+# 固定本轮版本，待 npm 制品发布后使用。
+npm install mobile-web-bridge@0.1.2
 ```
 
 安装 JS 包不会自动安装原生容器，仍需完成下文 iOS/Android 接入。
@@ -171,12 +175,12 @@ async function showMessage() {
 
 ### 1. 通过 CocoaPods 接入
 
-在宿主 App 的 Podfile 对应 target 中加入，固定使用源码 Tag `0.1.1`：
+在宿主 App 的 Podfile 对应 target 中加入，固定使用源码 Tag `0.1.2`：
 
 ```ruby
 # 从 Git Tag 安装指定版本。
 platform :ios, '15.0'
-pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.1'
+pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.2'
 ```
 
 iOS 暂不提供公共 CocoaPods Specs 安装。需要自定义原生实现时，也可将上面的 Git 依赖替换为本地源码依赖：
@@ -200,7 +204,7 @@ import MobileWebBridge
 // 宿主按需提供应用信息；未配置的专属能力会返回明确错误。
 final class AppBridgeHost: MWBHostDelegate {
     func appInfo() -> [String: Any]? {
-        ["appId": "my-app", "appVersionName": "1.0.0",
+        ["appId": "my-app", "appVersionName": "0.1.2",
          "appVersionCode": 1, "environment": 2]
     }
 }
@@ -230,7 +234,7 @@ final class HomeViewController: UIViewController {
 
 ### 1. 添加 Maven 依赖
 
-Maven 坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.1`。在宿主工程中添加仓库和依赖，再继续下方的宿主初始化与页面打开步骤，无需克隆本仓库。
+本轮 Maven 坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.2`，须待 Maven Central 制品发布后使用。发布后在宿主工程添加以下仓库和依赖即可；当前请使用本节后面的本地 library 模块方式，或按 [Android README](MWB-Android/README.md#maven-制品与独立接入) 构建本地 Maven 制品。
 
 在宿主根目录的 `settings.gradle.kts` 中配置依赖仓库；已有配置时补齐缺少的仓库即可：
 
@@ -250,11 +254,11 @@ dependencyResolutionManagement {
 ```kotlin
 dependencies {
     // 固定版本；同时带入 Manifest、资源、consumer 混淆规则及传递依赖。
-    implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.1")
+    implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.2")
 }
 ```
 
-使用 Groovy DSL 的工程可在 `app/build.gradle` 的 `dependencies { ... }` 中写 `implementation 'io.github.gaoxiao228:mobile-web-bridge:0.1.1'`，仓库同样配置 `google()` 与 `mavenCentral()`。
+使用 Groovy DSL 的工程可在 `app/build.gradle` 的 `dependencies { ... }` 中写 `implementation 'io.github.gaoxiao228:mobile-web-bridge:0.1.2'`，仓库同样配置 `google()` 与 `mavenCentral()`。
 
 同步 Gradle 后构建 App。宿主的 minSdk 至少为 24，构建环境使用 JDK 17；本仓库示例使用 compileSdk `35`、AGP `8.9.2`、Kotlin `2.0.21`、Gradle `8.11.1`。Maven 制品会声明 Kotlin、AppCompat 和 Google Code Scanner 等传递依赖，通常无需手动复制 AAR 或额外引入 DSBridge。扫码能力需要设备具备 Google Play 服务，完整能力差异见 [兼容表](docs/compatibility.md)。
 
@@ -296,7 +300,7 @@ class MyApplication : Application() {
         MWB.install(object : MWBHost {
             override fun appInfo(): JSONObject = JSONObject()
                 .put("appId", packageName)
-                .put("appVersionName", "1.0.0")
+                .put("appVersionName", "0.1.2")
                 .put("appVersionCode", 1)
                 .put("environment", 2)
         })
@@ -365,7 +369,7 @@ Demo 包括 48 方法目录与调试详情、导航栏样式配置页、原生�
 
 ## 页面来源与平台约定
 
-- 线上页面必须把完整来源加入 allowedOrigins，例如 `https://app.example.com`，不包含路径；只有自己控制的网页才应加入。业务插件的网络目标域名策略由宿主另行配置。
+- `allowedOrigins` 默认是 iOS 的 `["*"]` / Android 的 `setOf("*")`，省略该参数即可允许所有 HTTP/HTTPS 来源加载并使用原生桥，两端 Demo 同样使用此默认值。需要限制时显式传入完整来源，例如 `https://app.example.com`，不包含路径。仅完整星号有效，不支持子域名通配符；显式空集合仅允许内置本地页面。星号不放宽本地文件、其他协议或系统网络限制。业务插件的网络目标域名策略由宿主另行配置。
 - Android 沿用 DSBridge 的 JavascriptInterface，桥会进入所有 frame，宿主页面不得嵌入不可信 frame。插件 documentId 用于文档生命周期隔离，不能作为防 XSS 的凭证。
 - 容器默认禁用双指缩放和正文长按菜单；`navigateTo` 新容器默认隐藏导航栏，需要显示时传 `hidden: false`。导航栏支持右上角文字按钮及 JS 点击回调。
 - 相机、相册、扫码等仍受系统权限和设备能力限制；Android 扫码依赖 Google Play 服务，iOS 的 `exitApp()` 返回不支持。具体差异以兼容表为准。

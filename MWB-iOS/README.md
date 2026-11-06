@@ -4,22 +4,26 @@ Swift 编写的 Web 容器，底层使用 DSBridge 3.0.6。最低系统版本为
 
 ## 接入
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前原生版本 `0.1.0`，配合 JS `0.1.1-beta.1` 和插件协议 1；未发布 CocoaPods Specs。
+当前源码支持默认本地 HTML 错误页、自定义 Bundle 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.2` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
+
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本 `0.1.2`，配合本轮 JS/Android `0.1.2` 源码和插件协议 1；通过共享 Tag `0.1.2` 或本地 Pod 接入，暂不提供公共 CocoaPods Specs 安装。
 
 仓库根目录提供单仓库 Podspec。使用 Git 接入时固定源码 Tag：
 
 ```ruby
 # 固定共享源码版本，避免跟随分支变化。
-pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.1'
+pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.2'
 ```
 
-源码 Tag `0.1.1` 包含根 Podspec。它是仓库源码版本，不代表发布新的 CocoaPods Specs。需要修改源码或离线开发时，可使用本目录的本地 CocoaPods 接入：
+示例中的 Git 接入固定共享 Tag `0.1.2`；该 Tag 标识仓库源码，不代表发布了公共 CocoaPods Specs。需要修改源码或离线开发时，可使用本目录的本地 CocoaPods 接入：
 
 ```ruby
 pod 'MobileWebBridge', :path => '/absolute/path/to/MWB-iOS'
 ```
 
-宿主创建 `MWBConfiguration(initialURL:allowedOrigins:)`，然后将 `MWBWebViewController` 放入自己的导航栈。`allowedOrigins` 使用完整来源（例如 `https://app.example.com`），不包含路径；未列出的远程页面和重定向会被拦截。App 包内的本地文件可直接加载。
+宿主创建 `MWBConfiguration(initialURL: url)`，然后将 `MWBWebViewController` 放入自己的导航栈。`allowedOrigins` 默认为 `["*"]`，允许全部 HTTP/HTTPS 来源及其重定向，并允许这些页面使用原生桥；`make(initialURLString:)` 使用相同默认值。需要限制时，显式传入完整来源（例如 `["https://app.example.com"]`），不包含路径，未列出的远程页面和重定向会被拦截。仅完整的 `"*"` 具有通配含义，不支持 `https://*.example.com`。显式空集合仅允许包内本地文件；星号不放开包外文件或 `javascript:`、`data:` 等协议，也不绕过系统网络限制。
+
+Demo 启动配置使用默认的 `["*"]`。在 H5 的 `navigateTo` 详情中修改 `url` 并运行，或在 Safari 控制台设置 `window.location.href`，即可测试远程跳转；结果显示在新容器或当前页面中。修改原生配置后需重新编译安装。
 
 容器会为每个页面设置不可缩放的 viewport，并关闭长按文字菜单和链接预览；输入框仍可正常输入与选中文字。这个行为也适用于宿主加载的可信线上 H5 页面。
 
@@ -120,11 +124,11 @@ xcodebuild -workspace MWBExample.xcworkspace -scheme MWBExample \
   -destination 'generic/platform=iOS' build-for-testing CODE_SIGNING_ALLOWED=NO
 ```
 
-`build-for-testing` 只编译 XCTest，不表示已在设备执行测试；主文档首屏时序、真实 WebView/网络和前后台行为仍需宿主的设备验收。本次不发布 Pod；发布前还需验证远程 Tag、宿主权限及业务域名配置。
+`build-for-testing` 只编译 XCTest，不表示已在设备执行测试；主文档首屏时序、真实 WebView/网络和前后台行为仍需宿主的设备验收。Git Pod 可按共享 Tag `0.1.2` 接入；宿主仍需验证自己的权限及业务域名配置。
 
 ## 加载状态与首屏就绪
 
-当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。已发布的 JS `0.1.1-beta.1` 与原生 `0.1.0` 不包含此能力；须同时接入含本能力的 JS 与原生源码。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
+当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 iOS、Android 和 JS `0.1.2`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
 
 iOS 在加载视图前注册闭包；也可继承容器并重写 `pageDidBecomeReady()`，无需调用 super。
 

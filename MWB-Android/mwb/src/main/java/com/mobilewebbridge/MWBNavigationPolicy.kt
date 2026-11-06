@@ -2,8 +2,9 @@ package com.mobilewebbridge
 
 import android.net.Uri
 
-/** 精确比较宿主列出的 HTTP(S) 来源；仅允许打包的 android_asset 文件。 */
+/** 精确比较 HTTP(S) 来源，单独的 * 允许全部远程来源；本地文件仍限 android_asset。 */
 class MWBNavigationPolicy(allowedOrigins: Set<String>) {
+    private val allowsAllHttpOrigins = "*" in allowedOrigins
     private val origins = allowedOrigins.mapNotNull(::origin).toSet()
 
     fun isTrusted(url: String?): Boolean {
@@ -11,7 +12,8 @@ class MWBNavigationPolicy(allowedOrigins: Set<String>) {
         val uri = Uri.parse(url)
         if (uri.scheme == "file") return uri.host.isNullOrEmpty() && uri.path?.startsWith("/android_asset/") == true &&
             !uri.pathSegments.contains("..")
-        return origin(url)?.let(origins::contains) == true
+        // 先校验 HTTP(S) 来源，避免星号放开脚本协议或任意文件。
+        return origin(url)?.let { allowsAllHttpOrigins || it in origins } == true
     }
 
     private fun origin(value: String): String? {

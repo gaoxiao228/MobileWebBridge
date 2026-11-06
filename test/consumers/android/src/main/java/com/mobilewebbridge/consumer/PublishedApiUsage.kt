@@ -9,6 +9,7 @@ import com.mobilewebbridge.MWBActivity
 import com.mobilewebbridge.MWBConfiguration
 import com.mobilewebbridge.MWBHost
 import com.mobilewebbridge.MWBLoadState
+import com.mobilewebbridge.MWBErrorPageConfiguration
 import com.mobilewebbridge.plugins.MWBMethod
 import com.mobilewebbridge.plugins.MWBPlugin
 import com.mobilewebbridge.plugins.MWBPluginCallContext
@@ -22,6 +23,11 @@ object PublishedApiUsage {
         MWB.install(ConsumerHost())
         MWB.registerPlugin("consumerEcho") { EchoPlugin() }
     }
+
+    fun errorPageConfigurations(): List<MWBConfiguration> = listOf(
+        MWBConfiguration("https://example.com", setOf("https://example.com"), MWBErrorPageConfiguration(enabled = false)),
+        MWBConfiguration("https://example.com", setOf("https://example.com"), MWBErrorPageConfiguration(assetDirectory = "custom-error"))
+    )
 
     fun containerIntent(context: Context): Intent = MWBActivity.createIntent(
         context,
@@ -50,6 +56,10 @@ class ConsumerActivity : MWBActivity() {
 
 /** 编译覆盖宿主接口和来自 Android 平台的参数、返回值。 */
 class ConsumerHost : MWBHost {
+    override fun configureContainer(container: MWBActivity) {
+        // 当前容器参数不会强持有上一个页面。
+        container.onGoHome = { current -> current.load(current.configuration.initialUrl) }
+    }
     override fun appInfo(): JSONObject = JSONObject().put("name", "consumer")
     override fun deviceId(): String = "consumer-fixture"
     override fun setBadgeCount(count: Int): Boolean = count >= 0

@@ -32,7 +32,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
               let url = Bundle.main.url(forResource: "index", withExtension: "html") else { return }
 
         let window = UIWindow(windowScene: windowScene)
-        let configuration = MWBConfiguration(initialURL: url, allowedOrigins: [])
+        // 默认来源为 ["*"]，允许远程 HTTP(S) 跳转及桥调用；可显式传入来源收紧范围。
+        let configuration = MWBConfiguration(initialURL: url)
         let controller = ExampleWebViewController(configuration: configuration)
         controller.host = host
         let navigationController = UINavigationController(rootViewController: controller)
@@ -46,11 +47,17 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 // 示例宿主只显式注册 demo 页面，便于验证任意类名不会被 JS 打开。
 private final class ExampleHost: MWBHostDelegate {
+    func configureContainer(_ container: MWBWebViewController) {
+        // 业务可以在此改为原生首页导航；示例选择回到本地 Web 首页。
+        container.onGoHome = { current in
+            if let home = Bundle.main.url(forResource: "index", withExtension: "html") { current.load(home) }
+        }
+    }
     func appInfo() -> [String: Any]? {
         [
             "appId": "mwb-ios-example",
-            "appVersionName": "0.1.0",
-            "appVersionCode": 1,
+            "appVersionName": "0.1.2",
+            "appVersionCode": 2,
             "environment": 0
         ]
     }

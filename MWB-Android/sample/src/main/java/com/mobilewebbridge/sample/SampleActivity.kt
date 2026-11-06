@@ -26,10 +26,16 @@ class SampleApplication : Application() {
 }
 
 private class SampleHost(private val context: Context) : MWBHost {
+    override fun configureContainer(container: MWBActivity) {
+        // 每个子容器使用参数中的当前实例，不捕获启动页 Activity。
+        container.onGoHome = { current -> current.load("file:///android_asset/index.html") }
+    }
     override fun appInfo(): JSONObject = JSONObject().put("appId", context.packageName)
-        .put("appVersionName", "0.1.0").put("appVersionCode", 1).put("environment", 0)
-    override fun nativePage(name: String, extInfo: JSONObject?): Intent? =
-        if (name == "sample") Intent(context, SampleNativeActivity::class.java) else null
+        .put("appVersionName", "0.1.2").put("appVersionCode", 2).put("environment", 0)
+    override fun nativePage(name: String, extInfo: JSONObject?): Intent? = when (name) {
+        "sample" -> Intent(context, SampleNativeActivity::class.java)
+        else -> null
+    }
 }
 
 /** 示例容器直接作为启动页，与 iOS 示例一样展示内置 H5。 */
@@ -39,8 +45,9 @@ class SampleWebActivity : MWBActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // 启动入口只接受内置页面配置，丢弃外部 Intent 传来的地址覆盖项。
         intent.replaceExtras(Bundle().apply {
+            // 默认来源为 setOf("*")，允许 HTTP(S) 跳转及桥调用；可显式传入来源收紧范围。
             putSerializable(EXTRA_CONFIGURATION,
-                MWBConfiguration("file:///android_asset/index.html", emptySet()))
+                MWBConfiguration("file:///android_asset/index.html"))
         })
         // 必须先于 super.onCreate 注册，才能收到首次 loading；不要覆盖 WebViewClient。
         onLoadStateChange = { state ->

@@ -63,6 +63,14 @@ run('xcodebuild', [
 
 // 检查最终宿主中的资源，避免 Podspec 声明存在但清单没有随 App 分发。
 const appPath = join(workspace, 'DerivedData/Build/Products/Release-iphoneos/MWBConsumer.app');
+// 默认错误页必须随 CocoaPods 消费进入最终宿主，且保留完整的独立资源 Bundle。
+for (const name of ['index.html', 'error.css', 'error.js', 'runtime.js']) {
+  const matches = readdirSync(appPath, { recursive: true }).filter(path =>
+    path.endsWith(`MobileWebBridgeErrorPage.bundle/${name}`));
+  assert.equal(matches.length, 1, `错误页资源缺失或重复：${name}`);
+  assert.ok(readFileSync(join(appPath, matches[0])).length > 0);
+}
+console.log('已验证宿主默认错误页资源');
 // CocoaPods 可能将 Bundle 放在 App 根目录或嵌入的动态 Framework 中。
 const manifests = readdirSync(appPath, { recursive: true }).filter(path =>
   path.endsWith('MobileWebBridgePrivacy.bundle/PrivacyInfo.xcprivacy'));

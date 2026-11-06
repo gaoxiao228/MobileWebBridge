@@ -59,13 +59,18 @@ open class MWBWebViewController: UIViewController {
 
     /// 仅本次 DSBridge prompt 的主 frame 可调用业务网关。
     var isPluginBridgeTrusted: Bool {
-        guard let source = pluginBridgeSource else { return false }
+        guard !hasFailedDocument, let source = pluginBridgeSource else { return false }
         return isTrusted(source)
     }
     fileprivate func beginPluginDocument(_ url: URL) {
-        guard isTrusted(url) else { invalidatePluginDocument(); return }
+        guard !hasFailedDocument, isTrusted(url) else { invalidatePluginDocument(); return }
         pluginDocumentURL = url
         pluginSession.beginDocument(url: url)
+    }
+    /// 失败文档不能通过迟到脚本重新建立业务桥身份。
+    private var hasFailedDocument: Bool {
+        if case .failed = loadState { return true }
+        return false
     }
     private func invalidatePluginDocument() {
         isPageReady = false
@@ -80,6 +85,16 @@ open class MWBWebViewController: UIViewController {
     public private(set) var loadState: MWBLoadState = .idle {
         didSet { if oldValue != loadState { onLoadStateChange?(loadState) } }
     }
+    /// 首页由业务方决定；传入当前容器，避免子页回调捕获父页。
+    public var onGoHome: ((MWBWebViewController) -> Void)? {
+        didSet { errorPresenter?.updateHomeAvailability(onGoHome != nil) }
+    }
+    public private(set) var errorPageError: MWBPageLoadError?
+    private var errorPresenter: MWBErrorPagePresenter?
+    private var retrying = false
+    private var loadingURL: URL?
+    private var loadingMethod: String? = "GET"
+    private var navigationGeneration = 0
     private var activeNavigation: WKNavigation?
     private var requestedNavigation: WKNavigation?
     public private(set) var webView: DWKWebView?
@@ -217,30 +232,96 @@ open class MWBWebViewController: UIViewController {
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
         self.webView = webView
+        errorPresenter = MWBErrorPagePresenter(parent: view, configuration: configuration.errorPage,
+            onRetry: { [weak self] in self?.retryFailedPage() }, onGoHome: { [weak self] in self?.goHomeFromError() })
+        host?.configureContainer(self)
         load(initialPageOverride ?? configuration.initialURL)
     }
 
     /// 装载指定页面，后续安全策略会在导航委托中继续校验重定向。
     public func load(_ url: URL) {
         guard isTrusted(url) else {
-            // 拒绝新目标不破坏当前仍在显示的可信文档。
-            if loadState == .idle { loadState = .failed("Untrusted URL: \(url.absoluteString)") }
+            // 已有有效页面时拒绝新目标，但不遮盖当前文档。
+            if loadState == .idle { failLoad(kind: .blockedNavigation, message: "Untrusted URL: \(url.absoluteString)", url: url) }
             return
         }
+        navigationGeneration += 1
+        requestedNavigation = nil; activeNavigation = nil
+        webView?.stopLoading()
+        retrying = false; errorPresenter?.dismiss(); errorPageError = nil
+        webView?.isHidden = false
+        loadingURL = url; loadingMethod = "GET"
         invalidatePluginDocument()
-        if url.isFileURL, let root = Bundle.main.resourceURL {
-            requestedNavigation = webView?.loadFileURL(url, allowingReadAccessTo: root)
-        } else {
-            requestedNavigation = webView?.load(URLRequest(url: url))
-        }
+        requestedNavigation = startRequest(url)
         loadState = .loading
     }
 
+    private func startRequest(_ url: URL) -> WKNavigation? {
+        if url.isFileURL, let root = Bundle.main.resourceURL {
+            return webView?.loadFileURL(url, allowingReadAccessTo: root)
+        }
+        return webView?.load(URLRequest(url: url))
+    }
+
     public func reload() {
+        if errorPageError != nil { retryFailedPage(); return }
         guard let webView else { return }
+        navigationGeneration += 1
         invalidatePluginDocument()
         requestedNavigation = webView.reload()
         loadState = .loading
+    }
+
+    private func retryFailedPage() {
+        guard let failure = errorPageError, !retrying, failure.canRetry, isTrusted(failure.url) else { return }
+        navigationGeneration += 1
+        retrying = true; errorPresenter?.setRetrying(true)
+        invalidatePluginDocument()
+        loadingURL = failure.url; loadingMethod = "GET"
+        requestedNavigation = startRequest(failure.url)
+        loadState = .loading
+    }
+
+    private func goHomeFromError() {
+        guard let callback = onGoHome, let failure = errorPageError else { return }
+        if retrying {
+            navigationGeneration += 1
+            let generation = navigationGeneration
+            requestedNavigation = nil; activeNavigation = nil
+            webView?.stopLoading(); invalidatePluginDocument()
+            retrying = false; errorPresenter?.setRetrying(false)
+            loadState = .failed(failure.message)
+            if generation != navigationGeneration || errorPageError == nil { return }
+        }
+        callback(self)
+    }
+
+    private func failLoad(kind: MWBPageLoadError.Kind, message: String, url: URL? = nil, method: String? = nil, status: Int? = nil) {
+        guard let target = url ?? loadingURL ?? webView?.url else { return }
+        invalidatePluginDocument()
+        requestedNavigation = nil; activeNavigation = nil
+        retrying = false
+        webView?.stopLoading()
+        let failure = MWBPageLoadError(kind: kind, url: target, method: method ?? loadingMethod, message: message, httpStatus: status)
+        errorPageError = failure
+        if configuration.errorPage.enabled {
+            webView?.isHidden = true
+            errorPresenter?.show(error: failure, canGoHome: onGoHome != nil)
+        }
+        // 通知放最后，宿主可同步导航或销毁，旧处理不回写新状态。
+        loadState = .failed(message)
+    }
+
+    private func navigationFailed(_ navigation: WKNavigation?, error: Error) {
+        guard let navigation, navigation === (requestedNavigation ?? activeNavigation), loadState == .loading else { return }
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled { return }
+        let kind: MWBPageLoadError.Kind
+        if loadingURL?.isFileURL == true { kind = .localResource }
+        else if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut { kind = .timeout }
+        else if nsError.domain == NSURLErrorDomain && (-1206 ... -1200).contains(nsError.code) { kind = .tls }
+        else { kind = .network }
+        failLoad(kind: kind, message: error.localizedDescription)
     }
 
     public override func viewWillAppear(_ animated: Bool) {
@@ -325,6 +406,7 @@ open class MWBWebViewController: UIViewController {
         sendEvent("pageHide")
         if isMovingFromParent || isBeingDismissed || navigationController?.isBeingDismissed == true {
             invalidatePluginDocument()
+            errorPresenter?.dispose()
         }
     }
 
@@ -377,6 +459,7 @@ open class MWBWebViewController: UIViewController {
     }
 
     deinit {
+        errorPresenter?.dispose()
         pluginSession?.invalidate()
         if let networkObserver { NotificationCenter.default.removeObserver(networkObserver) }
         appObservers.forEach(NotificationCenter.default.removeObserver)
@@ -449,6 +532,8 @@ extension MWBWebViewController: WKNavigationDelegate {
             let fragmentOnly = old != nil && old?.url == next?.url
                 && webView.url != url && navigationAction.navigationType != .reload
             if !fragmentOnly {
+                loadingURL = url
+                loadingMethod = navigationAction.request.httpMethod
                 invalidatePluginDocument()
                 // 放行新文档后，旧导航即使迟到失败也不再代表当前页面。
                 activeNavigation = nil
@@ -461,16 +546,17 @@ extension MWBWebViewController: WKNavigationDelegate {
                               decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         if navigationResponse.isForMainFrame,
            let response = navigationResponse.response as? HTTPURLResponse, response.statusCode >= 400 {
-            invalidatePluginDocument()
             // 先结束 WebKit 策略决策，再通知宿主，允许回调同步重入导航。
             decisionHandler(.cancel)
-            loadState = .failed("HTTP \(response.statusCode)")
+            failLoad(kind: .http, message: "HTTP \(response.statusCode)", url: response.url, status: response.statusCode)
             return
         }
         decisionHandler(.allow)
     }
 
     public final func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        // 失败已经撤销导航身份；迟到的 start 不能重新开放隐藏的业务文档。
+        guard navigation != nil, !hasFailedDocument || retrying else { return }
         if let requestedNavigation, requestedNavigation !== navigation { return }
         requestedNavigation = nil
         activeNavigation = navigation
@@ -484,26 +570,23 @@ extension MWBWebViewController: WKNavigationDelegate {
     }
 
     public final func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        invalidatePluginDocument()
-        loadState = .failed("Web content process terminated")
+        failLoad(kind: .rendererTerminated, message: "Web content process terminated")
     }
 
     public final func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        guard navigation === (requestedNavigation ?? activeNavigation), loadState == .loading else { return }
-        invalidatePluginDocument()
-        loadState = .failed(error.localizedDescription)
+        navigationFailed(navigation, error: error)
     }
 
     public final func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard navigation === (requestedNavigation ?? activeNavigation), loadState == .loading else { return }
+        errorPresenter?.dismiss(); errorPageError = nil; retrying = false
+        webView.isHidden = false
         publishVisibleAt()
         loadState = .loaded
     }
 
     public final func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        guard navigation === (requestedNavigation ?? activeNavigation), loadState == .loading else { return }
-        invalidatePluginDocument()
-        loadState = .failed(error.localizedDescription)
+        navigationFailed(navigation, error: error)
     }
 }
 

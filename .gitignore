@@ -36,8 +36,10 @@ docs/superpowers/
 
 # 内部发布、源码导出工具及其测试仅在本机维护，CI 接入检查脚本继续跟踪。
 /scripts/release-android.py
+/scripts/release.py
 /scripts/export-source.mjs
 /test/test_android_release.py
+/test/test_release.py
 /test/export-source.test.mjs
 
 # 内部性能样本、日志和临时文件不属于对外接入文档。

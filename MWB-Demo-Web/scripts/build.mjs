@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -34,6 +34,8 @@ copyFileSync(join(project, 'THIRD_PARTY_NOTICES.md'), join(output, 'THIRD_PARTY_
 // 接入方用自己的 TS 入口组合 native 插件；原默认 SDK 产物保持独立。
 execFileSync('pnpm', ['exec', 'esbuild', join(project, 'src/plugins-sdk.ts'), '--bundle', '--format=iife', '--platform=browser', '--preserve-symlinks', `--banner:js=${licenseBanner}`, `--outfile=${join(output, 'plugins.iife.js')}`], { cwd: sdk, stdio: 'inherit' });
 console.log(`已生成 ${output}`);
+// 保留自定义错误页目录，避免同名 index.html 覆盖 Demo 首页。
+cpSync(join(project, 'src/custom-error'), join(output, 'custom-error'), { recursive: true });
 
 if (syncNative) {
   // 原生工程保留本地 HTML，线上静态站点和两个 App 使用同一组构建文件。
@@ -43,6 +45,7 @@ if (syncNative) {
   ]) {
     mkdirSync(target, { recursive: true });
     for (const file of allFiles) copyFileSync(join(output, file), join(target, file));
+    cpSync(join(output, 'custom-error'), join(target, 'custom-error'), { recursive: true });
     console.log(`已同步 ${target}`);
   }
 }

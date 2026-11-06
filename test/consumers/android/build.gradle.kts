@@ -16,7 +16,7 @@ android {
 
 dependencies {
     // 此处不得替换为 project(:mwb) 或生产源码，以保留发布边界验证。
-    implementation("io.github.gaoxiao228:mobile-web-bridge:${providers.gradleProperty("mwbVersion").getOrElse("0.1.0")}")
+    implementation("io.github.gaoxiao228:mobile-web-bridge:${providers.gradleProperty("mwbVersion").getOrElse("0.1.2")}")
 }
 
 tasks.register("verifyPublishedRuntimeDependencies") {

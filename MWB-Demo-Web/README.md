@@ -23,6 +23,10 @@ npm run build
 
 ## 接入 iOS 与 Android 示例
 
+Demo 源码版本为 `0.1.2`，与本轮 JS、iOS 和 Android SDK 配套。
+
+两端示例都配置了错误页回 Web 首页的回调。需要验证时，可在 `navigateTo` 方法详情中将 `url` 改为同目录下不存在的页面地址，触发默认错误页；自定义模板示例保留在 `src/custom-error/`，构建同步时保留目录结构，可在原生创建容器时通过 `errorPage` 配置使用。首页不展示专门的错误页入口；接入约定见 [错误页与自定义模板](../docs/error-pages.md)。
+
 ```bash
 npm run sync:native
 ```
@@ -40,7 +44,7 @@ Demo 页面在原生容器中打开时会自动调用 `mwb.setEnableDebug(true)`
 
 配置页底部的“打开新容器页面”会再次通过 `mwb.navigateTo` 打开同一配置页，方便观察子页导航栏及返回上一页后的样式。每次打开的页面都有独立 WebView，默认隐藏原生导航栏。配置页保留网页返回按钮；普通 Demo 子页通过 URL 中的 `mwbChild=1` 显示顶部返回箭头，调用 `mwb.navigateBack()`。这些网页入口同时适用于本地 HTML 和已加入白名单的线上页面。
 
-如需让原生 App 加载线上测试页，宿主还必须把该 HTTPS 来源加入 `allowedOrigins`；默认示例没有放开任何远程来源。只有自己控制的网页才应加入白名单。
+两端 Demo 使用 `allowedOrigins` 的默认星号配置，可直接加载 HTTP/HTTPS 线上测试页并调用原生桥；若宿主需要限制来源，可显式配置完整来源列表，或传空集合仅允许内置本地页面。
 
 ## 试用顺序
 

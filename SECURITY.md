@@ -1,8 +1,8 @@
 # 安全与可信来源
 
-MWB 当前为公开 Beta 阶段：JS `0.1.1-beta.1` 已发布 npm，原生为 `0.1.0` 源码/本机制品。暂无稳定版或长期支持承诺。版本与支持范围见 [版本说明](docs/versioning.md)。
+MWB 当前源码版本为 `0.1.2`，尚未发布本轮制品；已发布 JS Beta 与 Android 版本见 [版本说明](docs/versioning.md)。暂无长期支持承诺。
 
-容器只应加载宿主控制的页面。allowedOrigins 限制页面来源，不能防止可信页面自身的 XSS。Android DSBridge JavascriptInterface 会进入所有 frame，页面不得嵌入不可信 frame；插件 documentId 仅用于生命周期隔离。业务插件仍需校验参数、账号状态和业务权限。
+`allowedOrigins` 默认星号允许所有 HTTP/HTTPS 页面使用原生桥；宿主可显式配置完整来源列表，或传空集合仅允许内置页面。来源限制不能防止可信页面自身的 XSS。Android DSBridge JavascriptInterface 会进入所有 frame，页面不得嵌入不可信 frame；插件 documentId 仅用于生命周期隔离。业务插件仍需校验参数、账号状态和业务权限。
 
 正式仓库为 [gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)，维护者主页为 [gaoxiao228](https://github.com/gaoxiao228)。常规功能问题使用 [Issues](https://github.com/gaoxiao228/MobileWebBridge/issues)。
 

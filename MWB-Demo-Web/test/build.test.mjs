@@ -10,6 +10,33 @@ const project = fileURLToPath(new URL('../', import.meta.url));
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const files = ['index.html', 'navigation-theme.html', 'native-plugins.html', 'styles.css', 'demo.js', 'mwb.iife.js', 'plugins.iife.js', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.txt'];
 
+test('首页不展示错误页入口，保留原生插件入口与方法目录', () => {
+  execFileSync(process.execPath, ['scripts/build.mjs'], { cwd: project, stdio: 'pipe' });
+  const dom = new JSDOM('<div id="app"></div>', { url: 'file:///android_asset/index.html', runScripts: 'outside-only' });
+  dom.window._dsbridge = {};
+  dom.window.mwb = {
+    getDeviceInfoSync: () => ({ osType: 2 })
+  };
+  try {
+    dom.window.eval(readFileSync(join(project, 'dist', 'demo.js'), 'utf8'));
+    const buttons = dom.window.document.querySelectorAll('[data-error-example]');
+    assert.equal(buttons.length, 0);
+    assert.doesNotMatch(dom.window.document.body.textContent, /默认错误页|自定义错误页/);
+    assert.ok(dom.window.document.querySelector('.plugin-entry'));
+    assert.ok(dom.window.document.querySelector('#method-search'));
+  } finally { dom.window.close(); }
+});
+
+test('customError：构建同步自定义模板目录，保留相对 CSS 和脚本', () => {
+  execFileSync(process.execPath, ['scripts/build.mjs', '--sync-native'], { cwd: project, stdio: 'pipe' });
+  for (const directory of ['MWB-iOS/Example/Resources', 'MWB-Android/sample/src/main/assets']) {
+    for (const name of ['index.html', 'error.css', 'error.js']) {
+      assert.equal(readFileSync(join(root, directory, 'custom-error', name), 'utf8'),
+        readFileSync(join(project, 'src/custom-error', name), 'utf8'));
+    }
+  }
+});
+
 /** 执行实际发布 bundle，只把无法在 Node 中存在的原生边界替换为确定响应。 */
 function pluginPage(native = true) {
   const html = readFileSync(join(project, 'dist', 'native-plugins.html'), 'utf8');
