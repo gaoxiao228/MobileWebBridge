@@ -4,18 +4,18 @@ Swift 编写的 Web 容器，底层使用 DSBridge 3.0.6。最低系统版本为
 
 ## 接入
 
-当前源码支持默认本地 HTML 错误页、自定义 Bundle 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.3` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
+当前源码支持默认本地 HTML 错误页、自定义 Bundle 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.4` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本 `0.1.3`，配合本轮 JS/Android `0.1.3` 源码和插件协议 1；通过共享 Tag `0.1.3` 或本地 Pod 接入，暂不提供公共 CocoaPods Specs 安装。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本 `0.1.4`，配合本轮 JS/Android `0.1.4` 源码和插件协议 1；通过共享 Tag `0.1.4` 或本地 Pod 接入，暂不提供公共 CocoaPods Specs 安装。
 
 仓库根目录提供单仓库 Podspec。使用 Git 接入时固定源码 Tag：
 
 ```ruby
 # 固定共享源码版本，避免跟随分支变化。
-pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.3'
+pod 'MobileWebBridge', :git => 'https://github.com/gaoxiao228/MobileWebBridge.git', :tag => '0.1.4'
 ```
 
-示例中的 Git 接入固定共享 Tag `0.1.3`；该 Tag 标识仓库源码，不代表发布了公共 CocoaPods Specs。需要修改源码或离线开发时，可使用本目录的本地 CocoaPods 接入：
+示例中的 Git 接入固定共享 Tag `0.1.4`；该 Tag 标识仓库源码，不代表发布了公共 CocoaPods Specs。需要修改源码或离线开发时，可使用本目录的本地 CocoaPods 接入：
 
 ```ruby
 pod 'MobileWebBridge', :path => '/absolute/path/to/MWB-iOS'
@@ -32,6 +32,39 @@ Demo 启动配置使用默认的 `["*"]`。在 H5 的 `navigateTo` 详情中修�
 宿主需在 Info.plist 中按使用的能力填写 `NSCameraUsageDescription`、`NSPhotoLibraryUsageDescription` 和 `NSPhotoLibraryAddUsageDescription`。示例工程已配置。iOS 的 `exitApp()` 保留 JS 方法，但返回不支持，不会结束进程。
 `setNavigationBarTheme` 支持标题、颜色、显示/隐藏及右上角文字按钮（`actionTxt`）。设置 `actionExt` 和 `onActionClick` 后，点击按钮会将 `actionExt` 传给当前页面的 JS 回调；空 `actionTxt` 会移除按钮。`actionIcon` 和状态栏等未实现字段返回 `-1004`。
 
+## 自动预热 WebView（iOS）
+
+当前源码默认启用自动预热：真实页面加载完成或通知首屏就绪，且页面已显示、所在 Scene 处于前台后，SDK 会在主线程空闲时准备一个备用 WebView。后续新容器优先取用已准备好的实例，不提前执行目标业务页面，不要求 H5 接入 `notifyPageReady`。宿主的 `configureContainer` 仍只在真实容器首次加载前调用一次。
+
+整个进程最多保留一个正在预热或已就绪的备用实例，会额外占用 WebKit 进程及内存资源；进入后台或收到内存警告时释放。首次进入 SDK、快速连续打开页面或备用尚未就绪时，直接正常创建 WebView，不等待预热。预热缩短引擎启动等待，页面自身的脚本、样式和网络请求仍需正常执行。
+
+宿主可按自己的内存预算关闭；配置会随 `navigateTo` 传给子容器，关闭的容器不取用也不触发备用：
+
+```swift
+// 只影响使用此配置的容器，其他启用预热的容器仍可准备备用实例。
+let configuration = MWBConfiguration(
+    initialURL: pageURL,
+    webViewPrewarmingEnabled: false
+)
+```
+
+此配置仅适用于 iOS 当前源码；已发布版本的能力以对应 Tag 为准。Android 不提供此开关。性能收益依设备、页面和预热命中情况而异。
+
+## 等待绘制后转场（iOS）
+
+当前源码的 `navigateTo` 支持可选 `waitForReady`，默认 `false`。预热只准备空白 WebView 引擎；若希望先完成目标页面加载与绘制准备再开始系统 push/present 动画，可显式开启：
+
+```javascript
+// 本地 HTML 和可信远程 URL 均适用；失败会拒绝 Promise。
+await mwb.navigateTo({ url: childURL, waitForReady: true });
+```
+
+SDK 在离屏的真实目标容器中完成主文档加载、视口布局，再通过公开 WebKit 快照 API 等待绘制准备。快照只用于确认绘制可用，立即释放，不显示、不保存；转场仍展示同一个真实 WebView。宿主配置钩子与插件在目标页面正常执行，目标页在转场前会执行脚本及其副作用，请避免让离屏页面自动弹窗或发起导航。
+
+整个准备阶段最多等待 3000 ms：加载、绘制准备失败或超时返回 `-1002` 并保留源页；源页离开或 App/所属 Scene 失活取消并返回 `-1005`。源文档已被替换时丢弃旧回复，避免回复进入新文档。同一源页有待准备请求时再次 `navigateTo` 返回 `-1004`；`waitForReady` 非布尔值返回 `-1001`。准备中的目标页不能嵌套调用 `navigateTo`。
+
+成功仍表示已发起导航，不表示系统动画结束。自动判断不依赖 `notifyPageReady()`，也不保证异步接口、懒加载图片、字体或后续业务渲染完成。该选项仅适用于当前 iOS 源码，Android 调用应省略；旧版本能力以对应 Tag 为准。Demo 在 iOS 提供“等待绘制后转场”和“立即转场（对照）”，Android 保持原导航行为。
+
 ## 本地示例
 
 ```bash
@@ -39,6 +72,8 @@ cd Example
 pod install
 xcodebuild -workspace MWBExample.xcworkspace -scheme MWBExample -destination 'generic/platform=iOS' build-for-testing CODE_SIGNING_ALLOWED=NO
 ```
+
+示例默认开启自动预热。在 Xcode 的 Scheme → Run → Arguments Passed On Launch 添加 `--mwb-disable-prewarming` 后重新启动，可关闭整条 Demo 导航链的预热用于对照；移除参数恢复默认。控制台 `[MWB-Prewarming]` 显示配置，`[MWB-Loading]` 记录配置钩子到加载完成的耗时，该指标不包含创建 WebView、转场或实际像素呈现，不能代替完整首屏测量。
 
 示例应用加载内置网页，首页隐藏空导航栏。`navigateTo` 新页面默认隐藏导航栏；传 `hidden: false` 可显示标题和返回按钮。在导航栈内，即使导航栏隐藏，也支持从屏幕左边缘向右滑返回；根页面不触发返回，交互转场期间不重复启动。系统手势直接执行原生返回，不等待异步 JS 返回键处理器；需要拦截的交互请使用页面返回按钮。页面源码由上级 `MWB-Demo-Web` 统一维护；更新页面或 JS SDK 后，在 `MWB-Demo-Web` 执行 `npm run sync:native`，再重新构建 Xcode 示例。项目公开方法及平台差异见上级 `docs` 中的兼容表。
 
@@ -124,11 +159,11 @@ xcodebuild -workspace MWBExample.xcworkspace -scheme MWBExample \
   -destination 'generic/platform=iOS' build-for-testing CODE_SIGNING_ALLOWED=NO
 ```
 
-`build-for-testing` 只编译 XCTest，不表示已在设备执行测试；主文档首屏时序、真实 WebView/网络和前后台行为仍需宿主的设备验收。Git Pod 可按共享 Tag `0.1.3` 接入；宿主仍需验证自己的权限及业务域名配置。
+`build-for-testing` 只编译 XCTest，不表示已在设备执行测试；主文档首屏时序、真实 WebView/网络和前后台行为仍需宿主的设备验收。Git Pod 可按共享 Tag `0.1.4` 接入；宿主仍需验证自己的权限及业务域名配置。
 
 ## 加载状态与首屏就绪
 
-当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 iOS、Android 和 JS `0.1.3`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
+当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 iOS、Android 和 JS `0.1.4`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
 
 iOS 在加载视图前注册闭包；也可继承容器并重写 `pageDidBecomeReady()`，无需调用 super。
 

@@ -24,6 +24,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         _ = MWBConfiguration(initialURL: configuration.initialURL, allowedOrigins: [], errorPage: .init(enabled: false))
         _ = MWBConfiguration(initialURL: configuration.initialURL, allowedOrigins: [],
             errorPage: .init(source: .bundled(bundle: .main, directory: "custom-error", entry: "index.html")))
+        // 框架外编译验证新开关与字符串工厂，同时保留旧初始化器的源码兼容性。
+        let coldConfiguration = MWBConfiguration(initialURL: configuration.initialURL, webViewPrewarmingEnabled: false)
+        precondition(!coldConfiguration.webViewPrewarmingEnabled)
+        _ = MWBConfiguration.make(initialURLString: configuration.initialURL.absoluteString, webViewPrewarmingEnabled: false)
         let controller = ConsumerWebController(configuration: configuration)
         controller.onLoadStateChange = { state in print(state) }
         controller.onPageReady = { [weak controller] in print(controller?.isPageReady == true) }

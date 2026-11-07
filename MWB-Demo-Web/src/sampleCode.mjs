@@ -1,9 +1,12 @@
+import { navigationOptions } from './runner.mjs';
+
 /** 根据当前参数生成可复制的 SDK 调用代码，事件示例保留回调引用。 */
-export function sampleCode(example, input) {
+export function sampleCode(example, input, platform = 'ios') {
   const name = example.name;
   let args;
   try { args = JSON.parse(input); if (!Array.isArray(args)) throw new Error(); }
   catch { return '// 请修正参数 JSON 后查看调用代码。'; }
+  if (name === 'navigateTo' && args[0]) args[0] = navigationOptions(args[0], platform);
   const handlerName = JSON.stringify(args[0] ?? 'nativeGreeting');
   if (name === 'registerHandler') return `const handler = message => {\n  console.log("原生消息", message);\n};\nmwb.registerHandler(${handlerName}, handler);`;
   if (name === 'unRegisterHandler') return `mwb.unRegisterHandler(${handlerName}, handler); // 与注册时使用同一函数`;

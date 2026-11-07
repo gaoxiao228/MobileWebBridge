@@ -1,5 +1,5 @@
 // MWB 的公开契约以用户提供的旧 JS SDK 类型为基准，版本和产品命名已更新。
-export const version = "0.1.3";
+export const version = "0.1.4";
 
 type TYPE_VERSION = typeof version;
 
@@ -43,6 +43,8 @@ export type ParamStorageClear = {
 
 
 export type ParamNavigateTo = {
+	/** 仅 iOS：SDK 等待主文档加载与绘制准备后转场，默认 false；最长等待 3000ms，不代表业务数据就绪。 */
+	waitForReady?: boolean;
 	/**
 	* 跳转地址
 	**/

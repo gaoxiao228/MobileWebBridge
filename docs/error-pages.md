@@ -149,4 +149,4 @@ let errorPage = MWBErrorPageConfiguration(enabled: false)
 val errorPage = MWBErrorPageConfiguration(enabled = false)
 ```
 
-两端 Demo 首页不展示专门的错误页入口。可在 `navigateTo` 方法详情中填写同目录下不存在的页面地址以触发默认错误页；自定义模板可参考上面的示例，在原生创建容器时通过 `errorPage` 配置使用。示例首页回调选择重新装载本地首页；真实 App 可以替换为自己的导航。
+两端 Demo 首页不展示专门的错误页入口。可在 `navigateTo` 方法详情中填写同目录下不存在的页面地址以触发默认错误页；iOS 示例默认开启等待绘制，需先选择“立即转场（对照）”或设置 `waitForReady: false`，否则加载失败会返回 `-1002` 并保留源页；自定义模板可参考上面的示例，在原生创建容器时通过 `errorPage` 配置使用。示例首页回调选择重新装载本地首页；真实 App 可以替换为自己的导航。

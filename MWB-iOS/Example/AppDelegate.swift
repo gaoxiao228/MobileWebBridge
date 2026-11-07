@@ -33,7 +33,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         let window = UIWindow(windowScene: windowScene)
         // 默认来源为 ["*"]，允许远程 HTTP(S) 跳转及桥调用；可显式传入来源收紧范围。
-        let configuration = MWBConfiguration(initialURL: url)
+        // Xcode 的 Arguments Passed On Launch 加 --mwb-disable-prewarming 可对照冷启动路径。
+        let prewarmingEnabled = !ProcessInfo.processInfo.arguments.contains("--mwb-disable-prewarming")
+        let configuration = MWBConfiguration(initialURL: url, webViewPrewarmingEnabled: prewarmingEnabled)
+        NSLog("[MWB-Prewarming] enabled=%@ (first page may still be cold)", String(prewarmingEnabled))
         let controller = ExampleWebViewController(configuration: configuration)
         controller.host = host
         let navigationController = UINavigationController(rootViewController: controller)
@@ -48,6 +51,18 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 // 示例宿主只显式注册 demo 页面，便于验证任意类名不会被 JS 打开。
 private final class ExampleHost: MWBHostDelegate {
     func configureContainer(_ container: MWBWebViewController) {
+        // 此日志只测配置钩子到 didFinish，不能当作打开动作到实际首屏的耗时。
+        let configuredAt = ProcessInfo.processInfo.systemUptime
+        let previous = container.onLoadStateChange
+        let prewarmingEnabled = container.configuration.webViewPrewarmingEnabled
+        container.onLoadStateChange = { state in
+            previous?(state)
+            if state == .loaded {
+                NSLog("[MWB-Loading] configure-to-didFinish=%.1f ms, prewarming=%@",
+                      (ProcessInfo.processInfo.systemUptime - configuredAt) * 1000,
+                      String(prewarmingEnabled))
+            }
+        }
         // 业务可以在此改为原生首页导航；示例选择回到本地 Web 首页。
         container.onGoHome = { current in
             if let home = Bundle.main.url(forResource: "index", withExtension: "html") { current.load(home) }
@@ -56,8 +71,8 @@ private final class ExampleHost: MWBHostDelegate {
     func appInfo() -> [String: Any]? {
         [
             "appId": "mwb-ios-example",
-            "appVersionName": "0.1.3",
-            "appVersionCode": 3,
+            "appVersionName": "0.1.4",
+            "appVersionCode": 4,
             "environment": 0
         ]
     }

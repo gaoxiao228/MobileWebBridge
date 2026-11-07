@@ -14,7 +14,7 @@ export const catalog = [
   item('setEnableDebug', '切换调试模式', '设置原生容器的调试开关。', 'container', [true], { note: 'Android 仅在可调试构建中生效。' }),
   item('toast', '显示原生提示', '在当前 App 中显示一条短消息。', 'container', [{ msg: '你好，Mobile Web Bridge' }]),
   // 开新页面由目录方法或详情运行按钮明确触发，无需重复弹出网页确认框。
-  item('navigateTo', '打开容器页面', '在新的 MWB 页面打开当前示例地址，默认不显示导航栏。', 'container', [{ url: '{{currentURL}}', title: 'MWB 示例子页' }]),
+  item('navigateTo', '打开容器页面', '在新的 MWB 页面打开当前示例地址。iOS 默认示范等待绘制后转场，可切换为立即转场对照；Android 保持立即转场。', 'container', [{ url: '{{currentURL}}', title: 'MWB 示例子页', waitForReady: true }]),
   item('navigateBack', '返回上一页', '结束当前 MWB 页面，可传回调数据。', 'container', [{ from: 'demo' }], { confirm: '将关闭当前页面。' }),
   item('navigateBackToRoot', '返回根页面', '回到 MWB 容器的首页。', 'container', [], { confirm: '将返回容器首页。' }),
   item('openExternalBrowser', '使用系统浏览器打开', '把 HTTPS 地址交给系统浏览器。', 'container', [{ url: 'https://example.com' }], { confirm: '将离开当前 App 打开系统浏览器。' }),

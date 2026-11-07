@@ -2,22 +2,22 @@
 
 Kotlin 编写的 Android Web 容器，最低 API 24。`mwb` 是可供宿主依赖的 Android library，`sample` 是本地网页示例。底层固定使用 [DSBridge Android 3.0.0](https://github.com/wendux/DSBridge-Android/tree/3.0.0) 的三个 Java 源文件（提交 `d3e5ebc6ca8170f97e420f2f482680c8e149b471`）；做了 AndroidX、Android 35 兼容、安全设置及主线程导航分发优化。
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。Android 版本为 `0.1.3`，对应 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.3`，配合 JS/iOS `0.1.3` 和插件协议 1 使用。分发状态见 [版本说明](../docs/versioning.md)；也支持源码 library 模块和本地 Maven 接入。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。Android 版本为 `0.1.4`，对应 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.4`，配合 JS/iOS `0.1.4` 和插件协议 1 使用。分发状态见 [版本说明](../docs/versioning.md)；也支持源码 library 模块和本地 Maven 接入。
 
 构建将完整许可放入 AAR 的 classes.jar（META-INF/mobile-web-bridge/）；Sample assets 同时带网页/Vue/DSBridge声明，详见 THIRD_PARTY_NOTICES.md。
 
 ## 接入
 
-当前源码和默认构建版本为 `0.1.3`；错误页能力请使用配套原生 SDK，不能仅升级 H5。
+当前源码和默认构建版本为 `0.1.4`；错误页能力请使用配套原生 SDK，不能仅升级 H5。
 
-当前源码支持默认本地 HTML 错误页、自定义 assets 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.3` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
+当前源码支持默认本地 HTML 错误页、自定义 assets 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.4` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
 
 将 `mwb` 模块作为 Gradle library 引入宿主项目。使用 JDK 17、Android SDK 35 和 Gradle Wrapper 构建。宿主在 `Application.onCreate` 安装应用专属能力：
 
 ```kotlin
 MWB.install(object : MWBHost {
     override fun appInfo() = JSONObject().put("appId", packageName)
-        .put("appVersionName", "0.1.3").put("appVersionCode", 3).put("environment", 2)
+        .put("appVersionName", "0.1.4").put("appVersionCode", 4).put("environment", 2)
     override fun nativePage(name: String, extInfo: JSONObject?): Intent? =
         if (name == "profile") Intent(this@MyApplication, ProfileActivity::class.java) else null
 })
@@ -54,13 +54,13 @@ Android 导航栏标题始终按整条栏居中；返回控件显示左箭头，
 
 ## Maven 制品与独立接入
 
-Android 与 iOS、JS、Demo 共用一个仓库发布 Tag（本轮为 `0.1.3`），不单独创建 Android 平台 Tag。Git Tag 固定源码提交，Maven 版本由本次发布的版本表确定，详见 [共享 Tag 约定](../docs/versioning.md#多端共享-git-tag)。
+Android 与 iOS、JS、Demo 共用一个仓库发布 Tag（本轮为 `0.1.4`），不单独创建 Android 平台 Tag。Git Tag 固定源码提交，Maven 版本由本次发布的版本表确定，详见 [共享 Tag 约定](../docs/versioning.md#多端共享-git-tag)。
 
-本轮坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.3`。在消费工程配置 `google()`、`mavenCentral()` 并添加该坐标；需要本地构建时使用以下文件仓库流程。
+本轮坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.4`。在消费工程配置 `google()`、`mavenCentral()` 并添加该坐标；需要本地构建时使用以下文件仓库流程。
 
 ```bash
 # 当前目录：显式指定本地构建版本，仅写入 build/maven-repository。
-./gradlew :mwb:publishReleasePublicationToLocalIntegrationRepository -PmwbVersion=0.1.3
+./gradlew :mwb:publishReleasePublicationToLocalIntegrationRepository -PmwbVersion=0.1.4
 ```
 
 生成 release AAR、sources、Dokka API 文档 JAR、POM 和 Gradle 元数据；POM 包含 Kotlin、AppCompat 和扫码的传递依赖。接入方在 settings 的 dependencyResolutionManagement 中配置文件仓库，再按坐标依赖：
@@ -73,7 +73,7 @@ repositories {
     mavenCentral()
 }
 // app/build.gradle.kts
-dependencies { implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.3") }
+dependencies { implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.4") }
 ```
 
 在源码根目录执行 `python3 scripts/check-android-consumer.py`，自动检查 AAR/许可/sources/POM，并让独立工程仅通过坐标和 POM 编译公开 API，避免 project 依赖掩盖分发问题。脚本可加 `--offline`，此时需要依赖已缓存；它不安装或运行设备。
@@ -138,7 +138,7 @@ Sample release 开启消费端 R8，可检查 `sample/build/outputs/mapping/rele
 
 ## 加载状态与首屏就绪
 
-当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 Android、iOS 和 JS `0.1.3`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
+当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 Android、iOS 和 JS `0.1.4`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
 
 Android 在子类的 `super.onCreate` 前安装回调，并让宿主 Manifest/Intent 指向该子类；失败原因通过 `loadError` 读取。
 

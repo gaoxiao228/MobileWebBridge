@@ -1,6 +1,6 @@
 # 容器加载状态与首屏就绪
 
-本页能力已包含在 **Android Maven `0.1.1`** 中。H5 须使用当前 JS 源码，iOS 须使用当前原生源码；已发布的 JS `0.1.1-beta.1` 和旧 iOS/Android `0.1.0` 不包含此能力。仅升级 JS 不能为旧 App 增加原生实现。
+本页能力已包含在 **Android Maven `0.1.1`** 中。本轮请配套使用 JS/iOS/Android `0.1.4`，此前 `0.1.3` 亦已提供加载与首屏通知；已发布的 JS `0.1.1-beta.1` 和旧 iOS/Android `0.1.0` 不包含此能力。仅升级 JS 不能为旧 App 增加原生实现。
 
 每个容器分别提供 `onLoadStateChange`、`onPageReady`、只读 `loadState` 和 `isPageReady`。回调在主线程执行，没有历史重放；晚注册可读取当前状态。加载状态相同时不重复通知，连续两次整页加载如果一直处于 loading，不额外产生一次 loading 回调。
 
@@ -131,3 +131,9 @@ MWB 不依赖 Vue 或其他前端框架。Vue 的 `nextTick()` 只保证相应 D
 | -1106 | 旧原生没有兼容网关或协议不兼容 |
 
 不支持和普通浏览器环境都会明确失败，不会伪造首屏通知成功。
+
+## iOS 导航绘制准备
+
+iOS `0.1.4` 支持 `navigateTo({ url, waitForReady: true })`：目标在离屏真实容器中加载，SDK 以主文档 loaded 和 WebKit 绘制准备为转场条件，不依赖 `notifyPageReady()` 或业务 `onPageReady`。`pageShow` 仍在目标实际出现时发送，加载与脚本执行可能先于页面可见。快照仅用于绘制准备，不作为过渡画面。默认不等待，Android 不使用此参数。
+
+此条件不保证异步业务数据、懒加载资源或后续布局完成；成功表示已发起原系统转场。3000 ms 总等待、失败和取消处理见 [iOS 接入说明](../MWB-iOS/README.md)。

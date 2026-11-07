@@ -5,17 +5,20 @@ public struct MWBConfiguration {
     public let initialURL: URL
     /// 默认 ["*"] 允许所有 HTTP(S) 页面加载并使用原生桥；显式空集合仅允许包内文件。
     public let allowedOrigins: Set<String>
+    /// 默认在页面稳定显示后预热一个备用 WebView；可按宿主内存预算关闭。
+    public let webViewPrewarmingEnabled: Bool
     public let errorPage: MWBErrorPageConfiguration
 
-    public init(initialURL: URL, allowedOrigins: Set<String> = ["*"], errorPage: MWBErrorPageConfiguration = .init()) {
+    public init(initialURL: URL, allowedOrigins: Set<String> = ["*"], errorPage: MWBErrorPageConfiguration = .init(), webViewPrewarmingEnabled: Bool = true) {
         self.initialURL = initialURL
         self.allowedOrigins = allowedOrigins
         self.errorPage = errorPage
+        self.webViewPrewarmingEnabled = webViewPrewarmingEnabled
     }
 
     /// 从字符串建立配置，避免把空地址交给 WebView。
-    public static func make(initialURLString: String, allowedOrigins: Set<String> = ["*"], errorPage: MWBErrorPageConfiguration = .init()) -> Self? {
+    public static func make(initialURLString: String, allowedOrigins: Set<String> = ["*"], errorPage: MWBErrorPageConfiguration = .init(), webViewPrewarmingEnabled: Bool = true) -> Self? {
         guard let url = URL(string: initialURLString), url.scheme != nil else { return nil }
-        return Self(initialURL: url, allowedOrigins: allowedOrigins, errorPage: errorPage)
+        return Self(initialURL: url, allowedOrigins: allowedOrigins, errorPage: errorPage, webViewPrewarmingEnabled: webViewPrewarmingEnabled)
     }
 }

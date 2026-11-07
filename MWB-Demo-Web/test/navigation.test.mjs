@@ -26,3 +26,17 @@ test('句柄代码示例跟随编辑后的名称更新', () => {
   assert.match(code, /mwb\.registerHandler\("customGreeting", handler\)/);
   assert.doesNotMatch(code, /nativeGreeting/);
 });
+
+
+test('等待绘制参数仅在 iOS 示例中传入，false 保留用于对照', async () => {
+  const { resolveArgs } = await import('../src/runner.mjs');
+  const item = catalog.find(entry => entry.name === 'navigateTo');
+  for (const waitForReady of [true, false]) {
+    const input = JSON.stringify([{ url: 'https://example.test/child', waitForReady }]);
+    assert.equal(resolveArgs(item, input, { platform: 'ios' })[0].waitForReady, waitForReady);
+    assert.equal('waitForReady' in resolveArgs(item, input, { platform: 'android' })[0], false);
+    assert.equal('waitForReady' in resolveArgs(item, input, { platform: 'browser' })[0], false);
+    assert.match(sampleCode(item, input, 'ios'), /waitForReady/);
+    assert.doesNotMatch(sampleCode(item, input, 'android'), /waitForReady/);
+  }
+});

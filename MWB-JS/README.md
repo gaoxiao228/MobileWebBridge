@@ -2,7 +2,7 @@
 
 MWB 为 iOS 和 Android 的 Web 容器提供统一 JS API。原生通信由 DSBridge 3.x 完成。
 
-当前版本为 `0.1.3`，与同一 Git Tag 下的 iOS/Android 源码配套。下方安装命令固定为 `0.1.3`；分发状态见 [版本说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/versioning.md)，需要本地构建时可按 [源码构建与安装](https://github.com/gaoxiao228/MobileWebBridge#从源码构建-js-sdk) 使用。
+当前版本为 `0.1.4`，与同一 Git Tag 下的 iOS/Android 源码配套。下方安装命令固定为 `0.1.4`；分发状态见 [版本说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/versioning.md)，需要本地构建时可按 [源码构建与安装](https://github.com/gaoxiao228/MobileWebBridge#从源码构建-js-sdk) 使用。
 
 正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。建议固定精确版本；Git Tag 与 npm 分发标签独立，原生接入与支持范围见 [项目 README](https://github.com/gaoxiao228/MobileWebBridge#readme)。
 
@@ -10,7 +10,7 @@ MWB 为 iOS 和 Android 的 Web 容器提供统一 JS API。原生通信由 DSBr
 
 ```bash
 # 固定项目版本；原生端也使用配套版本。
-npm install mobile-web-bridge@0.1.3
+npm install mobile-web-bridge@0.1.4
 ```
 
 ```ts
@@ -42,7 +42,7 @@ await mwb.setNavigationBarTheme({
 
 当前源码新增 `await mwb.basic.notifyPageReady()`（也可用根入口 `mwb.notifyPageReady()`），用于 H5 主动通知当前原生容器首屏准备完成。无需注册业务插件，重复调用幂等。成功表示原生接受通知，不代表宿主已完成展示。
 
-此能力请配套使用 JS、iOS 和 Android `0.1.3`。此方法走文档身份网关，等待上限 30000ms；旧原生和普通浏览器明确失败。调用时机、原生回调和重载规则见 [接入说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/page-lifecycle.md)。
+此能力请配套使用 JS、iOS 和 Android `0.1.4`。此方法走文档身份网关，等待上限 30000ms；旧原生和普通浏览器明确失败。调用时机、原生回调和重载规则见 [接入说明](https://github.com/gaoxiao228/MobileWebBridge/blob/main/docs/page-lifecycle.md)。
 
 ## 同步与异步调用
 
@@ -93,7 +93,9 @@ async function copyMessage() {
 }
 ```
 
-Promise 完成仅表示该方法约定的操作完成：`navigateTo` 成功不等于新页面首屏完成，`toast` 成功不等于提示已消失。具体结果仍以各方法契约为准。
+Promise 完成仅表示该方法约定的操作完成：`navigateTo` 默认在发起导航时成功，`toast` 成功不等于提示已消失。具体结果仍以各方法契约为准。
+
+当前 iOS 源码可传 `await mwb.navigateTo({ url: childURL, waitForReady: true })`，由 SDK 自动等待主文档加载及 WebKit 绘制准备后再发起原系统转场；无需 H5 报告 ready。参数默认 `false`，Android 应省略此参数。总等待 3000 ms，加载/绘制失败或超时拒绝为 `-1002`，源页离开或后台取消为 `-1005`，同源已有准备请求为 `-1004`，非布尔值为 `-1001`。源文档失效后旧回复丢弃。成功不表示动画结束或异步业务数据完成，详见 [iOS 接入说明](../MWB-iOS/README.md)。
 
 除新增 `notifyPageReady()` 外，既有 basic 异步调用没有统一超时及文档失效兜底；原生未回调时可能持续等待。业务添加等待超时只会停止自己的等待，不代表原生操作已取消；支付等操作尤其不能据超时推断业务失败或直接重试。
 

@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import CoreFoundation
 
 /// 页面与 WebView 控制方法均在主线程操作 UIKit。
 extension MWBBridgeAdapter {
@@ -37,28 +38,51 @@ extension MWBBridgeAdapter {
             respond(.failure(-1001, "Invalid or untrusted URL"), with: handler)
             return
         }
-        // URL、标题、导航栏显隐和弹出方式之外的旧项目参数尚未实现。
-        let unsupported = params.keys.filter { !["url", "title", "hidden", "isPopUp"].contains($0) }
+        // 未实现的旧项目参数继续明确拒绝。
+        let unsupported = params.keys.filter { !["url", "title", "hidden", "isPopUp", "waitForReady"].contains($0) }
         guard unsupported.isEmpty else {
             respond(.failure(-1004, "Unsupported navigateTo options: \(unsupported.joined(separator: ", "))"), with: handler)
             return
         }
+        // NSNumber 的 0/1 不能当成 JSON boolean 接受。
+        if let option = params["waitForReady"],
+           !(option is NSNumber && CFGetTypeID(option as CFTypeRef) == CFBooleanGetTypeID()) {
+            respond(.failure(-1001, "waitForReady must be a boolean"), with: handler)
+            return
+        }
+        let sourceRevision = controller.documentRevision
         DispatchQueue.main.async {
-            // 注册表在首个容器创建时冻结，新容器获取同一组定义并创建独立会话。
+            // JS 发出请求后、主队列开始准备前，来源也可能已整页导航。
+            guard controller.documentRevision == sourceRevision else { return }
+            guard controller.pendingNavigation == nil, controller.navigationPreparation == nil else {
+                self.respond(.failure(-1004, "Navigation preparation is already pending"), with: handler)
+                return
+            }
             let next = MWBWebViewController(configuration: controller.configuration)
             next.host = controller.host
             next.initialPageOverride = url
-            // 默认隐藏；导航配置页等场景可传 hidden=false 显式显示。
             next.initialNavigationBarHidden = params["hidden"] as? Bool ?? true
             next.title = params["title"] as? String
-            if params["isPopUp"] as? Bool == true {
-                controller.present(UINavigationController(rootViewController: next), animated: true)
-            } else if let navigationController = controller.navigationController {
-                navigationController.pushViewController(next, animated: true)
-            } else {
-                controller.present(next, animated: true)
+            let show: (MWBWebViewController) -> Void = { [weak controller] next in
+                guard let controller else { return }
+                if params["isPopUp"] as? Bool == true {
+                    controller.present(UINavigationController(rootViewController: next), animated: true)
+                } else if let navigationController = controller.navigationController {
+                    navigationController.pushViewController(next, animated: true)
+                } else {
+                    controller.present(next, animated: true)
+                }
             }
-            self.respond(.success(), with: handler)
+            if params["waitForReady"] as? Bool == true {
+                let preparation = MWBNavigationPreparation(source: controller, target: next, show: show) {
+                    self.respond($0, with: handler)
+                }
+                controller.pendingNavigation = preparation
+                preparation.start()
+            } else {
+                show(next)
+                self.respond(.success(), with: handler)
+            }
         }
     }
 

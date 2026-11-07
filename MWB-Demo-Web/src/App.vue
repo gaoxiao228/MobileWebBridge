@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { catalog, groups } from './catalog.mjs';
-import { createRunner } from './runner.mjs';
+import { createRunner, navigationOptions } from './runner.mjs';
 import { sampleCode } from './sampleCode.mjs';
 import { createDemoState } from './useDemoState.mjs';
 
@@ -17,7 +17,7 @@ async function openPlugins(event) {
   try {
     const url = new URL('./native-plugins.html', window.location.href);
     url.searchParams.set('mwbChild', '1');
-    await sdk.navigateTo({ url: url.href, hidden: true });
+    await sdk.navigateTo(navigationOptions({ url: url.href, hidden: true, waitForReady: true }, context.platform));
   } catch (error) { returnError.value = `打开插件页面失败：${error?.message ?? String(error)}`; }
 }
 // Demo 子页通过 URL 标记显示网页返回入口，不改变 SDK 的容器参数。
@@ -47,7 +47,7 @@ let requestToken = 0;
 let catalogScrollY = 0;
 
 const groupName = computed(() => groups.find(item => item.id === active.value.group)?.label ?? '');
-const code = computed(() => sampleCode(active.value, argsInput.value));
+const code = computed(() => sampleCode(active.value, argsInput.value, context.platform));
 const needsImage = computed(() => JSON.stringify(active.value.args).includes('{{imageBase64}}'));
 const methodMode = computed(() => active.value.group === 'events' ? '事件与句柄' :
   active.value.name.endsWith('Sync') || active.value.name === 'setEnableDebug' ? '同步调用' : '异步调用');
@@ -107,6 +107,15 @@ const runner = createRunner(sdk, event => {
   eventLog.value.unshift({ id: Date.now() + Math.random(), time: new Date().toLocaleTimeString(), ...event });
   if (eventLog.value.length > 20) eventLog.value.length = 20;
 });
+
+// 对照按钮直接更新可编辑参数与复制代码，运行结果沿用真实桥接响应。
+function setNavigationWait(enabled) {
+  try {
+    const args = JSON.parse(argsInput.value);
+    args[0].waitForReady = enabled;
+    argsInput.value = JSON.stringify(args, null, 2);
+  } catch { returnError.value = '请先修正调用参数 JSON。'; }
+}
 
 function syncHash() {
   const selected = catalog.find(item => item.name === window.location.hash.slice(1));
@@ -203,7 +212,7 @@ async function runQuickMethod(item) {
   try {
     // 导航栏配置需要独立原生容器，目录入口先打开子页；信息按钮仍保留 JSON 调试。
     const response = item.name === 'setNavigationBarTheme'
-      ? await sdk.navigateTo({ url: new URL('./navigation-theme.html', window.location.href).href, title: '导航栏样式', hidden: true })
+      ? await sdk.navigateTo(navigationOptions({ url: new URL('./navigation-theme.html', window.location.href).href, title: '导航栏样式', hidden: true, waitForReady: true }, context.platform))
       : await runner.run(item, JSON.stringify(item.args), context);
     rememberMediaResult(item, response);
     quickResults[item.name] = { state: 'success', text: formatValue(response) };
@@ -329,6 +338,11 @@ function clearEvents() {
 
         <section class="content-section" aria-labelledby="args-heading">
           <div class="section-head"><h3 id="args-heading">调用参数</h3><span>JSON 数组</span></div>
+          <div v-if="active.name === 'navigateTo' && context.platform === 'ios'" class="section-head">
+            <button type="button" class="quiet-button" :disabled="busy" @click="setNavigationWait(true)">等待绘制后转场</button>
+            <button type="button" class="quiet-button" :disabled="busy" @click="setNavigationWait(false)">立即转场（对照）</button>
+          </div>
+          <p v-if="active.name === 'navigateTo'" class="method-note">仅 iOS 支持等待绘制，最多 3 秒；失败保留当前页。成功表示已发起导航，异步业务数据可能仍在加载。</p>
           <label class="sr-only" for="args-input">调用参数 JSON</label>
           <textarea id="args-input" v-model="argsInput" class="args-editor" spellcheck="false" autocomplete="off"></textarea>
           <div v-if="needsImage" class="image-picker">

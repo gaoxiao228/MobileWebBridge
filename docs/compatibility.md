@@ -2,12 +2,12 @@
 
 当前源码的 iOS/Android 容器均新增默认本地 HTML 错误页、自定义模板、重试、`onGoHome` 与宿主 `configureContainer`；旧 Pod `0.1.0` 和 Maven `0.1.1` 不包含这些能力。错误页属于原生容器能力，不增加业务 JS 方法，详见 [错误页接入](error-pages.md)。
 
-此表以 JS、iOS 和 Android 的 `0.1.3` 源码及插件协议 1 为基准；本轮 npm/Maven 制品已公开，历史版本和环境边界见 [版本说明](versioning.md)。`0` 为成功；`-1001` 参数错误、`-1002` 操作失败、`-1003` 方法缺失、`-1004` 平台不支持、`-1005` 宿主能力未配置、`-1006` 页面不可信、`-1007` 用户取消、`-1008` 权限拒绝或操作忙。异步方法返回 `{errCode, result?, errorMsg?}`；失败的 JS Promise 会拒绝。
+此表以 JS、iOS 和 Android 的 `0.1.4` 源码及插件协议 1 为基准；本轮 npm/Maven 制品待公开核验，历史版本和环境边界见 [版本说明](versioning.md)。`0` 为成功；`-1001` 参数错误、`-1002` 操作失败、`-1003` 方法缺失、`-1004` 平台不支持、`-1005` 宿主能力未配置、`-1006` 页面不可信、`-1007` 用户取消、`-1008` 权限拒绝或操作忙。异步方法返回 `{errCode, result?, errorMsg?}`；失败的 JS Promise 会拒绝。
 
 | 方法 | iOS | Android | 备注 |
 | --- | --- | --- | --- |
 | `setEnableDebug` | 原生 | 原生 | Android 仅调试构建可开启 |
-| `navigateTo` | 原生 | 原生 | 只允许可信 URL；两端默认隐藏新容器导航栏，可传 `hidden: false` 显示；iOS 另支持 `isPopUp`，其他选项返回 `-1004` |
+| `navigateTo` | 原生 | 原生 | 只允许可信 URL；两端默认隐藏新容器导航栏，可传 `hidden: false` 显示；iOS 另支持 `isPopUp`、`waitForReady`（默认 false，SDK 自动完成主文档加载及绘制准备后转场，最多 3000ms）；Android 应省略 `waitForReady`；其他选项返回 `-1004` |
 | `navigateBack` | 原生 | 原生 | 结束当前 MWB 页面 |
 | `navigateBackToRoot` | 原生 | 原生 | 返回 MWB 容器根页 |
 | `setNavigationBarTheme` | 原生 | 原生 | 两端支持标题、颜色、显示/隐藏及右上角文字按钮 `actionTxt`；`onActionClick` 留在 JS，点击回传 `actionExt`。Android 另支持返回/关闭按钮及状态栏明暗。`actionIcon` 等未实现字段返回 `-1004` |
@@ -85,9 +85,9 @@
 
 生产环境只应将自己控制的网页来源加入白名单。Android DSBridge 3.0.0 的 `JavascriptInterface` 会进入页面内所有 frame，宿主页面不得嵌入不可信 frame；插件 documentId 用于生命周期隔离，不能作为 frame 隔离或防 XSS 的安全凭证。iOS 新网关基于 WKFrameInfo 拒绝 iframe。iOS 相机、相册和 Android 硬件能力仍需在目标设备上验收。本次插件测试和编译未替代真机 WebView、真实外网及前后台验收。
 
-## 当前源码新增：加载状态与首屏就绪
+## 加载状态与首屏就绪
 
-本能力尚未包含在上文的已发布版本中。当前 basic 源码共 49 个方法；新增的 `notifyPageReady()` 复用文档身份网关，其他既有 basic 原生方法仍使用各自入口。
+本能力已随配套的 `0.1.3` 提供，并由本轮 `0.1.4` 继续支持。当前 basic 源码共 49 个方法；新增的 `notifyPageReady()` 复用文档身份网关，其他既有 basic 原生方法仍使用各自入口。
 
 | 能力 | iOS | Android |
 | --- | --- | --- |
@@ -96,3 +96,7 @@
 | `mwb.basic.notifyPageReady()` / 根别名 | 文档网关，30000ms 有界等待 | 文档网关，30000ms 有界等待 |
 
 首次注册时机、导航边界、平台加载回调限制及错误语义见 [接入说明](page-lifecycle.md)。
+
+## iOS 自动预热与导航绘制准备（0.1.4）
+
+`MWBConfiguration.webViewPrewarmingEnabled` 默认 true，只预热空白引擎，不执行目标业务页面。`navigateTo.waitForReady` 为可选布尔值，默认 false；true 时 SDK 自动等待目标主文档加载与绘制准备，3000 ms 内未成功则返回 `-1002` 并保留源页。源页离开或后台取消为 `-1005`，源文档失效时丢弃旧回复，同源准备中再次导航为 `-1004`。成功表示已发起原系统转场，不表示动画结束或异步业务数据完成。Android 不支持这两个选项；H5 在 Android 应省略 `waitForReady`。旧 iOS 收到该参数返回不支持，需同步更新原生 SDK。

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { apiMethods } from "../src/apiManifest";
-import type { MWBJSSDK } from "../src/types";
+import type { MWBJSSDK, ParamNavigateTo } from "../src/types";
 
 // 这个清单来自用户提供的接口基准，防止公开方法被遗漏或意外改名。
 const expectedMethods = [
@@ -29,3 +29,7 @@ test("MWB exposes the 49 current methods", () => {
 type ClearStorageSignature = MWBJSSDK["clearStorageSync"];
 const clearStorage: ClearStorageSignature = (_groupName?: string) => {};
 void clearStorage;
+
+// iOS 自动绘制准备是可选布尔值，旧调用仍可省略。
+const preparedNavigation = { url: "https://example.com", waitForReady: true } satisfies ParamNavigateTo;
+void preparedNavigation;

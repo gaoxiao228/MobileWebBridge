@@ -1,45 +1,6 @@
 import UIKit
 import WebKit
 
-/// DSBridge 自行担任 WKUIDelegate；子类补上现代链接长按菜单的禁用回调。
-private final class MWBInteractionWebView: DWKWebView {
-    weak var pluginController: MWBWebViewController?
-
-    /// DSBridge 的同步 prompt 提供真实 frame；业务网关仅接受主文档。
-    override func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
-                          defaultText: String?, initiatedByFrame frame: WKFrameInfo,
-                          completionHandler: @escaping @MainActor (String?) -> Void) {
-        if prompt == "__mwb_plugin_document_start__" {
-            if frame.isMainFrame, let url = frame.request.url {
-                pluginController?.beginPluginDocument(url)
-            }
-            completionHandler(pluginController?.pluginSession.identity); return
-        }
-        if ["_dsbridge=mwb.pluginInfo", "_dsbridge=mwb.invokePlugin"].contains(prompt),
-           let data = defaultText?.data(using: .utf8),
-           let envelope = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-           let callback = envelope["_dscbstub"] as? String,
-           let document = pluginController?.pluginSession.identity {
-            // 不使用 DSBridge 延迟 jsCache；执行时身份检查保护重用的 dscb 编号。
-            pluginController?.pluginBridgeReply = { [weak self] result, _ in
-                guard let self, let parsed = MWBResult.parse(result),
-                      let script = MWBPluginJavaScript.reply(callback: callback, document: document, result: parsed) else { return }
-                self.evaluateJavaScript(script, completionHandler: nil)
-            }
-        }
-        defer { pluginController?.pluginBridgeReply = nil }
-        pluginController?.pluginBridgeSource = frame.isMainFrame ? frame.request.url : nil
-        defer { pluginController?.pluginBridgeSource = nil }
-        super.webView(webView, runJavaScriptTextInputPanelWithPrompt: prompt,
-                      defaultText: defaultText, initiatedByFrame: frame, completionHandler: completionHandler)
-    }
-
-    override func webView(_ webView: WKWebView, contextMenuConfigurationFor elementInfo: WKContextMenuElementInfo)
-        async -> UIContextMenuConfiguration? {
-        nil
-    }
-}
-
 /// MWB 页面加载状态，便于宿主展示自己的加载和错误界面。
 public enum MWBLoadState: Equatable {
     case idle
@@ -53,8 +14,8 @@ open class MWBWebViewController: UIViewController {
     public let configuration: MWBConfiguration
     let pluginSnapshot: MWBPluginSnapshot
     private(set) var pluginSession: MWBPluginSession!
-    fileprivate var pluginBridgeSource: URL?
-    fileprivate(set) var pluginBridgeReply: MWBJSCallback?
+    var pluginBridgeSource: URL?
+    var pluginBridgeReply: MWBJSCallback?
     private var pluginDocumentURL: URL?
 
     /// 仅本次 DSBridge prompt 的主 frame 可调用业务网关。
@@ -62,17 +23,45 @@ open class MWBWebViewController: UIViewController {
         guard !hasFailedDocument, let source = pluginBridgeSource else { return false }
         return isTrusted(source)
     }
-    fileprivate func beginPluginDocument(_ url: URL) {
+    func beginPluginDocument(_ url: URL) {
         guard !hasFailedDocument, isTrusted(url) else { invalidatePluginDocument(); return }
         pluginDocumentURL = url
         pluginSession.beginDocument(url: url)
     }
     /// 失败文档不能通过迟到脚本重新建立业务桥身份。
     private var hasFailedDocument: Bool {
+        if abandonedNavigationPreparation { return true }
         if case .failed = loadState { return true }
         return false
     }
+    // 文档代次同时隔离迟到的绘制完成与旧 JS 回复。
+    private(set) var documentRevision = 0
+    private var abandonedNavigationPreparation = false
+    var pendingNavigation: MWBNavigationPreparation?
+    weak var navigationPreparation: MWBNavigationPreparation?
+
+    var canStartPreparedNavigation: Bool {
+        guard let window = viewIfLoaded?.window, !window.isHidden,
+              (window.windowScene.map { $0.activationState == .foregroundActive }
+                ?? (UIApplication.shared.applicationState == .active)),
+              presentedViewController == nil, transitionCoordinator == nil,
+              navigationController?.transitionCoordinator == nil,
+              !isBeingDismissed, !isMovingFromParent else { return false }
+        return navigationController.map { $0.topViewController === self && $0.presentedViewController == nil } ?? true
+    }
+
+    /// 取消离屏目标时立即撤销其桥接会话，迟到脚本不能继续调用宿主插件。
+    func abandonNavigationPreparation() {
+        abandonedNavigationPreparation = true
+        webView?.stopLoading()
+        invalidatePluginDocument()
+    }
+
     private func invalidatePluginDocument() {
+        documentRevision += 1
+        pendingNavigation?.cancel(deliverReply: false)
+        navigationPreparation?.documentChanged()
+        hasRequestedPrewarming = false
         isPageReady = false
         pluginDocumentURL = nil
         pluginSession?.invalidate()
@@ -83,7 +72,12 @@ open class MWBWebViewController: UIViewController {
     public var onPageReady: (() -> Void)?
     public private(set) var isPageReady = false
     public private(set) var loadState: MWBLoadState = .idle {
-        didSet { if oldValue != loadState { onLoadStateChange?(loadState) } }
+        didSet {
+            if oldValue != loadState { onLoadStateChange?(loadState) }
+            // 宿主回调可重入 load；准备器读取当前状态而非外层旧值。
+            navigationPreparation?.stateChanged()
+            requestWebViewPrewarmingIfEligible()
+        }
     }
     /// 首页由业务方决定；传入当前容器，避免子页回调捕获父页。
     public var onGoHome: ((MWBWebViewController) -> Void)? {
@@ -105,6 +99,23 @@ open class MWBWebViewController: UIViewController {
     private var appObservers: [NSObjectProtocol] = []
     private var visibleAtMs: Int64?
     private var hasBeenVisible = false
+    private var isContainerVisible = false
+    private var hasRequestedPrewarming = false
+
+    /// 每次真正稳定显示最多申请一次；弱引用任务不能延长业务容器生命周期。
+    var isEligibleForWebViewPrewarming: Bool {
+        configuration.webViewPrewarmingEnabled && isContainerVisible
+            && viewIfLoaded?.window?.windowScene?.activationState == .foregroundActive
+            && transitionCoordinator == nil && navigationController?.transitionCoordinator == nil
+            && viewIfLoaded?.window?.isHidden == false
+            && (loadState == .loaded || isPageReady)
+    }
+
+    private func requestWebViewPrewarmingIfEligible() {
+        guard !hasRequestedPrewarming, isEligibleForWebViewPrewarming else { return }
+        hasRequestedPrewarming = true
+        MWBWebViewPrewarmer.shared.request(from: self)
+    }
     private var hasStartedNavigation = false
     var initialPageOverride: URL?
     var initialNavigationBarHidden: Bool?
@@ -155,7 +166,10 @@ open class MWBWebViewController: UIViewController {
                 self.isPageReady = true
                 self.pageDidBecomeReady()
                 // 扩展方法可同步导航；旧文档不能继续触发闭包。
-                if self.pluginSession.identity == document && self.isPageReady { self.onPageReady?() }
+                if self.pluginSession.identity == document && self.isPageReady {
+                    self.onPageReady?()
+                    self.requestWebViewPrewarmingIfEligible()
+                }
             }
             return .success()
         }
@@ -171,35 +185,9 @@ open class MWBWebViewController: UIViewController {
 
     public override func viewDidLoad() {
         super.viewDidLoad()
-        // 每次加载都约束 viewport，并阻止非编辑内容的系统长按选项。
-        let interactionScript = WKUserScript(source: """
-            (() => {
-              let viewport = document.querySelector('meta[name="viewport"]');
-              if (!viewport) {
-                viewport = document.createElement('meta');
-                viewport.name = 'viewport';
-                (document.head || document.documentElement).appendChild(viewport);
-              }
-              const settings = (viewport.content || '').split(',').map(value => value.trim())
-                .filter(value => value && !/^(minimum-scale|maximum-scale|user-scalable)\\s*=/.test(value));
-              viewport.content = [...settings, 'minimum-scale=1', 'maximum-scale=1', 'user-scalable=no'].join(', ');
-              const style = document.createElement('style');
-              style.textContent = `html, body { -webkit-touch-callout: none; }
-                body { -webkit-user-select: none; user-select: none; }
-                input, textarea, [contenteditable], [contenteditable] * {
-                  -webkit-user-select: text; user-select: text;
-                }`;
-              (document.head || document.documentElement).appendChild(style);
-              document.addEventListener('contextmenu', event => event.preventDefault(), true);
-            })();
-            """, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
-        let webConfiguration = WKWebViewConfiguration()
-        webConfiguration.userContentController.addUserScript(interactionScript)
-        // 主文档第一段脚本同步领取原生身份，不等待 didFinish 或业务 SDK 初始化。
-        webConfiguration.userContentController.addUserScript(WKUserScript(
-            source: "Object.defineProperty(window,'__mwbNativePluginDocumentId',{value:window.prompt('__mwb_plugin_document_start__',''),writable:false,configurable:false});",
-            injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        let webView = MWBInteractionWebView(frame: .zero, configuration: webConfiguration)
+        // 仅 ready 实例可同步移交；未命中直接冷启动，不阻塞导航转场。
+        let webView = (configuration.webViewPrewarmingEnabled ? MWBWebViewPrewarmer.shared.takeReady() : nil)
+            ?? MWBInteractionWebView.make()
         webView.pluginController = self
         webView.allowsLinkPreview = false
         webView.navigationDelegate = self
@@ -217,6 +205,15 @@ open class MWBWebViewController: UIViewController {
             NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                    object: nil, queue: .main) { [weak self] _ in
                 self?.sendEvent("appShow")
+                self?.hasRequestedPrewarming = false
+                self?.requestWebViewPrewarmingIfEligible()
+            },
+            NotificationCenter.default.addObserver(forName: UIScene.didActivateNotification,
+                                                   object: nil, queue: .main) { [weak self] notification in
+                guard let self, let scene = notification.object as? UIWindowScene,
+                      scene === self.viewIfLoaded?.window?.windowScene else { return }
+                self.hasRequestedPrewarming = false
+                self.requestWebViewPrewarmingIfEligible()
             },
             NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification,
                                                    object: nil, queue: .main) { [weak self] _ in
@@ -235,11 +232,14 @@ open class MWBWebViewController: UIViewController {
         errorPresenter = MWBErrorPagePresenter(parent: view, configuration: configuration.errorPage,
             onRetry: { [weak self] in self?.retryFailedPage() }, onGoHome: { [weak self] in self?.goHomeFromError() })
         host?.configureContainer(self)
+        // configureContainer 可重入取消任务；取消后不能再启动初始加载。
+        guard !abandonedNavigationPreparation else { return }
         load(initialPageOverride ?? configuration.initialURL)
     }
 
     /// 装载指定页面，后续安全策略会在导航委托中继续校验重定向。
     public func load(_ url: URL) {
+        guard !abandonedNavigationPreparation else { return }
         guard isTrusted(url) else {
             // 已有有效页面时拒绝新目标，但不遮盖当前文档。
             if loadState == .idle { failLoad(kind: .blockedNavigation, message: "Untrusted URL: \(url.absoluteString)", url: url) }
@@ -264,6 +264,7 @@ open class MWBWebViewController: UIViewController {
     }
 
     public func reload() {
+        guard !abandonedNavigationPreparation else { return }
         if errorPageError != nil { retryFailedPage(); return }
         guard let webView else { return }
         navigationGeneration += 1
@@ -390,6 +391,10 @@ open class MWBWebViewController: UIViewController {
 
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        isContainerVisible = true
+        hasRequestedPrewarming = false
+        // didAppear 可能仍在 UIKit 转场收尾中；下一主线程机会再校验，避免漏掉已快速加载的页面。
+        DispatchQueue.main.async { [weak self] in self?.requestWebViewPrewarmingIfEligible() }
         if !hasBeenVisible {
             // 首次出现在屏幕上才开始白屏计时，返回当前控制器时不重置。
             hasBeenVisible = true
@@ -400,8 +405,15 @@ open class MWBWebViewController: UIViewController {
         sendEvent("pageShow")
     }
 
+    public override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        isContainerVisible = false
+        pendingNavigation?.cancel()
+    }
+
     public override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        isContainerVisible = false
         restoreInteractivePopGesture()
         sendEvent("pageHide")
         if isMovingFromParent || isBeingDismissed || navigationController?.isBeingDismissed == true {

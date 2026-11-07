@@ -1,4 +1,5 @@
 <script setup>
+import { navigationOptions } from './runner.mjs';
 import { computed, onMounted, ref } from 'vue';
 
 const sdk = window.mwb;
@@ -107,11 +108,12 @@ async function openNewContainer() {
   openError.value = '';
   try {
     // 相对地址同时适用于线上静态站点、iOS Bundle 和 Android assets。
-    await sdk.navigateTo({
+    await sdk.navigateTo(navigationOptions({
       url: new URL('./navigation-theme.html', window.location.href).href,
       title: '导航栏样式子页',
-      hidden: true
-    });
+      hidden: true,
+      waitForReady: true
+    }, platform.value));
   } catch (error) {
     openError.value = `打开新容器失败：${error.message ?? String(error)}`;
   } finally {

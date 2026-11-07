@@ -1,3 +1,10 @@
+/** iOS 专有参数在其他平台省略；false 保留用于立即转场对照。 */
+export function navigationOptions(options, platform) {
+  const result = { ...options };
+  if (platform !== 'ios') delete result.waitForReady;
+  return result;
+}
+
 // 示例执行器把参数编辑、事件回调和 SDK 调用分开，页面只负责展示结果。
 const placeholders = {
   '{{imageBase64}}': ['imageBase64', '请先选择图片。'],
@@ -42,7 +49,10 @@ export function resolveArgs(example, input, context = {}) {
   if (example.name === 'convertImagePathToBase64') requiredString('path', '图片路径');
   if (example.name === 'openFile') requiredString('url', 'PDF 地址');
   if (example.name === 'makePhoneCall') requiredString('phoneNumber', '电话号码');
-  if (example.name === 'navigateTo') requiredString('url', '页面地址');
+  if (example.name === 'navigateTo') {
+    requiredString('url', '页面地址');
+    args[0] = navigationOptions(first, context.platform);
+  }
   if (example.name === 'openNativePage') requiredString('pageName', '原生页面名称');
   return args;
 }

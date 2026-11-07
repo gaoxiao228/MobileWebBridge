@@ -38,7 +38,7 @@ test('customError：构建同步自定义模板目录，保留相对 CSS 和脚�
 });
 
 /** 执行实际发布 bundle，只把无法在 Node 中存在的原生边界替换为确定响应。 */
-function pluginPage(native = true) {
+function pluginPage(native = true, osType = 2) {
   const html = readFileSync(join(project, 'dist', 'native-plugins.html'), 'utf8');
   const dom = new JSDOM(html, { url: 'https://example.test/native-plugins.html', runScripts: 'outside-only' });
   const calls = [];
@@ -52,6 +52,7 @@ function pluginPage(native = true) {
       register: (name, callback) => handlers.set(name, callback),
       hasNativeMethod: () => true,
       call(method, args, done) {
+        if (method === 'mwb.getDeviceInfoSync') return { osType };
         if (method === 'mwb.pluginSession') return JSON.stringify({ errCode: 0, result: { protocol: 1, documentId: 'demo-doc' } });
         if (method === 'mwb.pluginInfo') { done(JSON.stringify({ errCode: 0, result: { available: true } })); return; }
         calls.push({ method, args: JSON.parse(JSON.stringify(args ?? null)) });
@@ -122,6 +123,18 @@ test('插件页阻止非法参数并通过容器打开相同的插件子页', as
     assert.equal(new URL(navigation.args.url).pathname, '/native-plugins.html');
     assert.equal(new URL(navigation.args.url).searchParams.get('mwbChild'), '1');
     assert.equal(navigation.args.hidden, true);
+    assert.equal(navigation.args.waitForReady, true);
+  } finally { dom.window.close(); }
+});
+
+test('Android 插件子页省略 iOS 等待参数', async () => {
+  const { dom, calls } = pluginPage(true, 1);
+  try {
+    dom.window.document.querySelector('.plugin-open').click();
+    await new Promise(resolve => setImmediate(resolve));
+    const navigation = calls.find(call => call.method === 'mwb.navigateTo');
+    assert.ok(navigation);
+    assert.equal('waitForReady' in navigation.args, false);
   } finally { dom.window.close(); }
 });
 
@@ -557,10 +570,11 @@ test('navigateTo 点击运行后直接调用原生桥，不弹出网页确认框
   const dom = new JSDOM('<div id="app"></div>', { url: 'https://example.test/#navigateTo', runScripts: 'outside-only' });
   let confirmCount = 0;
   let navigateCount = 0;
+  const navigationOptions = [];
   dom.window._dsbridge = {};
   dom.window.mwb = {
     getDeviceInfoSync: () => ({ osType: 2 }),
-    navigateTo: async () => { navigateCount++; return { errCode: 0 }; }
+    navigateTo: async value => { navigationOptions.push(value); navigateCount++; return { errCode: 0 }; }
   };
   dom.window.confirm = () => { confirmCount++; return true; };
   try {
@@ -569,6 +583,14 @@ test('navigateTo 点击运行后直接调用原生桥，不弹出网页确认框
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(confirmCount, 0);
     assert.equal(navigateCount, 1);
+    assert.equal(navigationOptions[0].waitForReady, true);
+    const immediate = [...dom.window.document.querySelectorAll('button')].find(button => button.textContent.includes('立即转场（对照）'));
+    assert.ok(immediate);
+    immediate.click();
+    await new Promise(resolve => setImmediate(resolve));
+    dom.window.document.querySelector('.run-button').click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(navigationOptions[1].waitForReady, false);
   } finally {
     dom.window.close();
   }

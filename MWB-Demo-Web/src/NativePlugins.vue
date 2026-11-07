@@ -1,4 +1,5 @@
 <script setup>
+import { navigationOptions } from './runner.mjs';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 const sdk = window.mwb;
@@ -90,7 +91,8 @@ async function openContainer() {
     if (!native || !sdk) throw new Error('请在原生容器中打开新的插件页面。');
     const next = new URL(window.location.href);
     next.searchParams.set('mwbChild', '1');
-    await sdk.basic.navigateTo({ url: next.href, hidden: true });
+    const platform = sdk.basic.getDeviceInfoSync().osType === 1 ? 'android' : 'ios';
+    await sdk.basic.navigateTo(navigationOptions({ url: next.href, hidden: true, waitForReady: true }, platform));
   } catch (error) { if (active) { result.value = errorText(error); resultState.value = 'error'; } }
   finally { if (active) opening.value = false; }
 }
