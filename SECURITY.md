@@ -1,6 +1,6 @@
 # 安全与可信来源
 
-MWB 当前版本为 `0.1.4`，本轮 npm 与 Maven Central 制品待公开核验；各端分发与支持范围见 [版本说明](docs/versioning.md)。暂无长期支持承诺。
+MWB 当前版本为 `0.1.4`，npm 与 Maven Central 制品已公开；各端分发与支持范围见 [版本说明](docs/versioning.md)。暂无长期支持承诺。
 
 `allowedOrigins` 默认星号允许所有 HTTP/HTTPS 页面使用原生桥；宿主可显式配置完整来源列表，或传空集合仅允许内置页面。来源限制不能防止可信页面自身的 XSS。Android DSBridge JavascriptInterface 会进入所有 frame，页面不得嵌入不可信 frame；插件 documentId 仅用于生命周期隔离。业务插件仍需校验参数、账号状态和业务权限。
 

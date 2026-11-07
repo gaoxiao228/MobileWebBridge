@@ -266,7 +266,7 @@ Sample 网络仅允许 HTTPS example.com/httpbin.org、默认 443、GET/POST、�
 
 内部协议为 1。缺旧壳网关/协议不兼容 `-1106`；缺插件 `-1100`；缺方法 `-1101`；非法参数/JSON `-1102`；超时 `-1103`；文档失效 `-1104`；配置/执行异常 `-1105`；不可信 `-1006`。业务错误建议用正整数。旧页已销毁时，不承诺旧 JS 还能观察到拒绝，但不会向新文档投递。
 
-JS 预览版 `0.1.1-beta.1` 已发布 npm；Android `0.1.1` 已发布 Maven Central；本轮 JS/iOS/Android 目标版本统一为 `0.1.4`，npm 与 Maven Central 制品待公开核验，iOS 使用 Git Pod，未发布公共 CocoaPods Specs。当前验证覆盖 JS/H5 集成、Android Robolectric 与 R8 产物、iOS macOS 原生检查和 generic iOS 编译，并新增框架外的独立消费检查。真机 WebView/外网/前后台仍需按本版本验收；版本组合及支持边界见 [版本说明](versioning.md)。
+JS 预览版 `0.1.1-beta.1` 已发布 npm；Android `0.1.1` 已发布 Maven Central；当前 JS/iOS/Android 配套版本为 `0.1.4`，npm 与 Maven Central 制品已公开并通过公共仓库独立消费验证，iOS Tag 源码的独立 Pod 接入验证通过，未发布公共 CocoaPods Specs。当前验证覆盖 JS/H5 集成、Android Robolectric 与 R8 产物、iOS macOS 原生检查和 generic iOS 编译，并新增框架外的独立消费检查。真机 WebView/外网/前后台仍需按本版本验收；版本组合及支持边界见 [版本说明](versioning.md)。
 
 ## 内置首屏通知
 
