@@ -1,6 +1,6 @@
 # MWB Demo Web
 
-这是 Mobile Web Bridge 的 Vue 3 移动端方法示例工程。`src/` 是页面的唯一应用源码，构建产物可部署到任意支持 HTTPS 的静态站点，也可打包进 iOS、Android 示例 App。页面提供 SDK 的 48 个方法示例。
+这是 Mobile Web Bridge 的 Vue 3 移动端方法示例工程。`src/` 是页面的唯一应用源码，构建产物可部署到任意支持 HTTPS 的静态站点，也可打包进 iOS、Android 示例 App。页面提供 SDK 的 49 个方法示例。
 
 ## 构建
 
@@ -55,3 +55,7 @@ Demo 页面在原生容器中打开时会自动调用 `mwb.setEnableDebug(true)`
 `src/plugins-sdk.ts` 是自定义浏览器入口范例，只有 TypeScript 方法和事件类型、插件名和超时，不含版本及运行时方法表。更换原生插件需要重新编译 App；修改 JS 描述/页面后执行同步并重新构建 Demo。完整三端步骤见 [自定义原生插件接入](../docs/native-plugins.md)。
 
 先运行 `getAppInfoSync`、`toast`、`setStorageSync` 等低风险方法。图片相关方法可先选择本地图片，或先执行 `chooseImage` 再执行 `convertImagePathToBase64`。事件示例需要先订阅；`nativeGreeting` 句柄可由集成方的原生代码主动调用。宿主能力未配置或平台不支持时，页面会显示原生错误码。
+
+## 页面替换示例
+
+“替换当前页面”方法行默认使用主 H5 页面 `index.html` 作为替换地址，不携带子页标记或方法详情 hash；方法详情中仍可编辑参数。iOS 支持切换 `waitForReady`，Android 始终省略该字段。替换成功后来源页销毁，不依赖旧页继续执行。浏览器只预览页面，不模拟原生返回栈。

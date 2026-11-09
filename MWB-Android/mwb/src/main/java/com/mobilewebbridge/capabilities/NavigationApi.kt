@@ -35,12 +35,17 @@ class NavigationApi(private val activity: MWBActivity) {
         if (params != null && params.keys().asSequence().any { it !in setOf("url", "title", "hidden") })
             return cb.complete(MWBResult.failure(-1004, "Unsupported navigateTo options"))
         activity.runOnUiThread {
+            // 已提交替换的旧 Activity 不能再通过 navigateTo 创建另一条页面链。
+            if (activity.isRedirecting || activity.isFinishing || activity.isDestroyed)
+                return@runOnUiThread cb.complete(MWBResult.failure(-1004, "Current page cannot navigate"))
             // 新容器默认隐藏导航栏；页面可用 hidden=false 显式显示。
             val next = MWBActivity.createIntent(activity, activity.configuration)
                 .putExtra(MWBActivity.EXTRA_INITIAL_OVERRIDE, url)
                 .putExtra(MWBActivity.EXTRA_NAVIGATION_HIDDEN, params?.optBoolean("hidden", true) ?: true)
             params?.optString("title")?.takeIf(String::isNotEmpty)?.let { next.putExtra(MWBActivity.EXTRA_TITLE_OVERRIDE, it) }
             activity.startActivity(next)
+            // 主线程串行记录启动结果，覆盖 startActivity 到 onPause 之间的窗口。
+            activity.hasPendingPageNavigation = true
             cb.complete(MWBResult.success())
         }
     }
@@ -49,6 +54,47 @@ class NavigationApi(private val activity: MWBActivity) {
         activity.runOnUiThread {
             cb.complete(MWBResult.success())
             activity.finish()
+        }
+    }
+
+    /** 新页启动成功才结束来源；等待绘制仍是 iOS 专有能力。 */
+    @Suppress("DEPRECATION")
+    fun redirectTo(arg: Any, cb: CompletionHandler<Any>) {
+        val params = arg as? JSONObject
+        val url = params?.opt("url") as? String
+        if (url == null || !activity.isTrusted(url))
+            return cb.complete(MWBResult.failure(-1001, "Invalid or untrusted URL"))
+        if (params.keys().asSequence().any { it !in setOf("url", "title", "hidden") })
+            return cb.complete(MWBResult.failure(-1004, "Unsupported redirectTo options"))
+        if ((params.has("hidden") && params.opt("hidden") !is Boolean) ||
+            (params.has("title") && params.opt("title") !is String))
+            return cb.complete(MWBResult.failure(-1001, "Invalid redirectTo field types"))
+        val sourceDocument = activity.pluginSession.replyDocumentId()
+        activity.runOnUiThread {
+            if (activity.isFinishing || activity.isDestroyed || activity.isRedirecting ||
+                activity.hasPendingPageNavigation || !activity.isResumedForNavigation)
+                return@runOnUiThread cb.complete(MWBResult.failure(-1004, "Current page cannot be replaced"))
+            if (!activity.isTrustedPage() || activity.pluginSession.replyDocumentId() != sourceDocument)
+                return@runOnUiThread cb.complete(MWBResult.failure(-1005, "Source document is no longer active"))
+            val next = MWBActivity.createIntent(activity, activity.configuration)
+                .putExtra(MWBActivity.EXTRA_INITIAL_OVERRIDE, url)
+                .putExtra(MWBActivity.EXTRA_NAVIGATION_HIDDEN, params.optBoolean("hidden", true))
+            if (params.has("title")) next.putExtra(MWBActivity.EXTRA_TITLE_OVERRIDE, params.getString("title"))
+            activity.isRedirecting = true
+            try {
+                activity.startActivity(next)
+            } catch (_: ActivityNotFoundException) {
+                activity.isRedirecting = false
+                return@runOnUiThread cb.complete(MWBResult.failure(-1002, "Cannot start replacement page"))
+            } catch (_: SecurityException) {
+                activity.isRedirecting = false
+                return@runOnUiThread cb.complete(MWBResult.failure(-1002, "Cannot start replacement page"))
+            }
+            // 与 navigateBack 一样先提交原生回复；旧网页随后销毁，不依赖其继续运行。
+            activity.overridePendingTransition(0, 0)
+            cb.complete(MWBResult.success())
+            activity.finish()
+            activity.overridePendingTransition(0, 0)
         }
     }
 

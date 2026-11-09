@@ -14,7 +14,7 @@ final class CapabilitiesTests: XCTestCase {
             "clearStorageSync"
         ]
         let asynchronous = [
-            "toast", "navigateTo", "navigateBack", "navigateBackToRoot", "openExternalBrowser",
+            "toast", "navigateTo", "redirectTo", "navigateBack", "navigateBackToRoot", "openExternalBrowser",
             "setNavigationBarTheme", "cleanWebviewCache", "exitApp", "openNativePage",
             "openAppAuthorizeSetting", "setBadgeCount", "setClipboardData", "makePhoneCall",
             "getNotificationSwitchStatus", "compressImage", "scanCode", "saveImageToPhotosAlbum",

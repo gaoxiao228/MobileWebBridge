@@ -4,6 +4,25 @@ import { apiMethods } from "../src/apiManifest";
 
 afterEach(() => vi.unstubAllGlobals());
 
+test("redirectTo exposes basic alias and forwards platform options without dropping them", async () => {
+  // 捕获新方法漏注册或包装层吞掉 Android 不支持参数的错误。
+  const calls: Array<[string, unknown]> = [];
+  vi.stubGlobal("window", { _dsbridge: {}, dsBridge: {
+    register() {},
+    call(method: string, args: unknown, callback?: (value: unknown) => void) {
+      calls.push([method, args]);
+      callback?.({ errCode: 0 });
+    }
+  } });
+  const sdk = createMWB();
+  expect(typeof sdk.redirectTo).toBe("function");
+  expect(sdk.basic.redirectTo).toBe(sdk.redirectTo);
+  await sdk.basic.redirectTo({ url: "https://example.com/b", title: "B", hidden: false, waitForReady: true });
+  expect(calls).toEqual([["mwb.redirectTo", {
+    url: "https://example.com/b", title: "B", hidden: false, waitForReady: true
+  }]]);
+});
+
 test("the default SDK exposes every agreed method", () => {
   vi.stubGlobal("window", { dsBridge: { register() {} } });
   const sdk = createMWB();

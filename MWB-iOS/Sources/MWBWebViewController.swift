@@ -37,6 +37,7 @@ open class MWBWebViewController: UIViewController {
     // 文档代次同时隔离迟到的绘制完成与旧 JS 回复。
     private(set) var documentRevision = 0
     private var abandonedNavigationPreparation = false
+    private var wasReplaced = false
     var pendingNavigation: MWBNavigationPreparation?
     weak var navigationPreparation: MWBNavigationPreparation?
 
@@ -55,6 +56,14 @@ open class MWBWebViewController: UIViewController {
         abandonedNavigationPreparation = true
         webView?.stopLoading()
         invalidatePluginDocument()
+    }
+
+    /// UIKit 外观回调可能稍后才结束；从返回栈移除时立即撤销旧页的桥接身份。
+    func retireAfterReplacement() {
+        wasReplaced = true
+        webView?.stopLoading()
+        invalidatePluginDocument()
+        errorPresenter?.dispose()
     }
 
     private func invalidatePluginDocument() {
@@ -467,7 +476,7 @@ open class MWBWebViewController: UIViewController {
     }
 
     public func isTrusted(_ url: URL) -> Bool {
-        navigationPolicy.isTrusted(url)
+        !wasReplaced && navigationPolicy.isTrusted(url)
     }
 
     deinit {

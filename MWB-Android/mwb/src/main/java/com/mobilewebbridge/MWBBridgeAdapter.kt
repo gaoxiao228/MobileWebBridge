@@ -12,7 +12,7 @@ import wendu.dsbridge.CompletionHandler
 class MWBBridgeAdapter(private val activity: MWBActivity) {
     companion object {
         val nativeMethods = setOf(
-            "setEnableDebug", "navigateTo", "navigateBack", "navigateBackToRoot", "setNavigationBarTheme",
+            "setEnableDebug", "navigateTo", "redirectTo", "navigateBack", "navigateBackToRoot", "setNavigationBarTheme",
             "openExternalBrowser", "cleanWebviewCache", "openAppAuthorizeSetting", "toast", "getAppInfoSync",
             "setBadgeCount", "getDeviceInfoSync", "getClipboardDataSync", "setClipboardData", "makePhoneCall",
             "getNetworkTypeSync", "getNotificationSwitchStatus", "exitApp", "openNativePage", "compressImage",
@@ -57,6 +57,7 @@ class MWBBridgeAdapter(private val activity: MWBActivity) {
 
     @JavascriptInterface fun setEnableDebug(arg: Any): Any = sync { navigation.setEnableDebug(arg) }
     @JavascriptInterface fun navigateTo(arg: Any, cb: CompletionHandler<Any>) = async(cb) { navigation.navigateTo(arg, cb) }
+    @JavascriptInterface fun redirectTo(arg: Any, cb: CompletionHandler<Any>) = async(cb) { navigation.redirectTo(arg, cb) }
     @JavascriptInterface fun navigateBack(arg: Any, cb: CompletionHandler<Any>) = async(cb) { navigation.navigateBack(cb) }
     @JavascriptInterface fun navigateBackToRoot(arg: Any, cb: CompletionHandler<Any>) = async(cb) { navigation.navigateBackToRoot(cb) }
     @JavascriptInterface fun setNavigationBarTheme(arg: Any, cb: CompletionHandler<Any>) = async(cb) { navigation.setNavigationBarTheme(arg, cb) }

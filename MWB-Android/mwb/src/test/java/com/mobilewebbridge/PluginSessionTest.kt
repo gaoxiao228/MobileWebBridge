@@ -49,7 +49,7 @@ class PluginSessionTest {
     }
     @Test fun registryRejectsConflictsAndFreezesWithoutCreatingPlugins() {
         var created = 0; val registry = MWBPluginRegistry()
-        for (name in listOf("basic", "version", "navigateTo", "hasPlugin", "pluginSession", "pluginInfo", "invokePlugin",
+        for (name in listOf("basic", "version", "navigateTo", "redirectTo", "hasPlugin", "pluginSession", "pluginInfo", "invokePlugin",
             "pluginEvent", "dispatchEvent", "backBtnPressed", "registerHandler", "unRegisterHandlers", "unRegisterHandler",
             "checkHandlerExist", "onNetworkStatusChange", "offNetworkStatusChange", "onAppShow", "offAppShow", "onAppHide",
             "offAppHide", "onRemoteNotificationReceive", "offRemoteNotificationReceive", "onPageShow", "offPageShow",

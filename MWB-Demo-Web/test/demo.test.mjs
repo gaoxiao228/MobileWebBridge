@@ -13,8 +13,8 @@ test('H5 目录覆盖展示方法，但不提供容器就绪入口', () => {
   const manifest = source.match(/export const apiMethods = \[([\s\S]*?)\] as const/)?.[1];
   assert.ok(manifest, 'SDK 方法清单应能读取');
   const methods = [...manifest.matchAll(/"([A-Za-z]\w*)"/g)].map(match => match[1]);
-  assert.equal(methods.length, 49);
-  assert.equal(catalog.length, 48);
+  assert.equal(methods.length, 50);
+  assert.equal(catalog.length, 49);
   assert.deepEqual(catalog.map(item => item.name).sort(), methods.filter(name => name !== 'notifyPageReady').sort());
   // 已移除的接口不应继续出现在开发者示例页面。
   assert.equal(catalog.some(item => item.name === 'addWaterMark'), false);

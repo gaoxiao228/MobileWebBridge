@@ -42,6 +42,18 @@ export type ParamStorageClear = {
 };
 
 
+/** 替换当前原生容器；Android 必须省略 waitForReady，不支持创建新弹窗。 */
+export type ParamRedirectTo = {
+	/** 目标地址，沿用容器的可信来源限制。 */
+	url: string;
+	/** 新容器标题。 */
+	title?: string;
+	/** 是否隐藏导航栏，默认 true。 */
+	hidden?: boolean;
+	/** 仅 iOS：等待主文档加载和绘制准备，默认 false；最多 3000ms，失败保留当前页。 */
+	waitForReady?: boolean;
+};
+
 export type ParamNavigateTo = {
 	/** 仅 iOS：SDK 等待主文档加载与绘制准备后转场，默认 false；最长等待 3000ms，不代表业务数据就绪。 */
 	waitForReady?: boolean;
@@ -398,6 +410,8 @@ export interface MWBJSSDK {
 	 * 打开新页面
 	 **/
 	navigateTo(param: ParamNavigateTo): Promise<GenericAsyncResult<undefined>>;
+	/** 替换当前容器，返回时跳过被替换页；不要依赖旧页在成功后继续执行 JS。 */
+	redirectTo(param: ParamRedirectTo): Promise<GenericAsyncResult<undefined>>;
 	/**
 	 * 返回上一级
 	 *

@@ -4,7 +4,7 @@ import type { MWBJSSDK } from "./types";
 export const apiMethods = [
   "notifyPageReady",
   "setEnableDebug", "openAppAuthorizeSetting", "toast", "getAppInfoSync",
-  "setBadgeCount", "navigateTo", "navigateBack", "navigateBackToRoot",
+  "setBadgeCount", "navigateTo", "redirectTo", "navigateBack", "navigateBackToRoot",
   "openExternalBrowser", "setNavigationBarTheme", "getDeviceInfoSync", "getClipboardDataSync",
   "setClipboardData", "makePhoneCall", "getNetworkTypeSync", "getNotificationSwitchStatus",
   "cleanWebviewCache", "compressImage", "scanCode", "saveImageToPhotosAlbum",

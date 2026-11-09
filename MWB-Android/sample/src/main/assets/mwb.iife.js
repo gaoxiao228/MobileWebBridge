@@ -435,6 +435,7 @@ SOFTWARE.
     "getAppInfoSync",
     "setBadgeCount",
     "navigateTo",
+    "redirectTo",
     "navigateBack",
     "navigateBackToRoot",
     "openExternalBrowser",
@@ -701,6 +702,10 @@ SOFTWARE.
       },
       navigateTo(param) {
         return callAsync("navigateTo", param);
+      },
+      // 替换由原生一次完成，JS 不拼接打开和关闭操作。
+      redirectTo(param) {
+        return callAsync("redirectTo", param);
       },
       navigateBack(callbackInfo) {
         return callAsync("navigateBack", callbackInfo);

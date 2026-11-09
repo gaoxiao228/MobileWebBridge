@@ -31,6 +31,172 @@ class CapabilitiesTest {
             MWBActivity.createIntent(ApplicationProvider.getApplicationContext(), config)).setup().get()
     }
 
+    /** 通过与 DSBridge 相同的反射入口执行，漏注册时先给出明确断言。 */
+    private fun redirect(activity: MWBActivity, params: JSONObject): Int {
+        var code = Int.MIN_VALUE
+        val entry = MWBBridgeAdapter::class.java.methods.firstOrNull { it.name == "redirectTo" }
+        assertNotNull("redirectTo must be exposed to DSBridge", entry)
+        entry!!.invoke(MWBBridgeAdapter(activity), params, object : CompletionHandler<Any> {
+            override fun complete(retValue: Any) { code = (retValue as JSONObject).getInt("errCode") }
+            override fun complete() = Unit
+            override fun setProgressData(value: Any) = Unit
+        })
+        return code
+    }
+
+    @Test fun redirectToReplacesOnlyCurrentActivityAndInitializesNewNavigation() {
+        // Robolectric 复用沙箱；只在测试中隔离前例遗留的弱引用注册表。
+        val containers = MWBActivity::class.java.getDeclaredField("containers").apply { isAccessible = true }
+        (containers.get(null) as MutableList<*>).clear()
+        // 打开 B 后 A 必须结束，P 保持；新页使用自己的标题和导航栏参数。
+        val previous = activity()
+        val source = activity()
+        assertEquals(0, redirect(source, JSONObject().put("url", "file:///android_asset/index.html")
+            .put("title", "B").put("hidden", false)))
+        assertTrue(source.isFinishing)
+        assertFalse(previous.isFinishing)
+        val launched = org.robolectric.Shadows.shadowOf(source).nextStartedActivity
+        assertNotNull(launched)
+        val child = Robolectric.buildActivity(MWBActivity::class.java, launched).setup().get()
+        assertEquals("B", child.title.toString())
+        assertEquals(View.VISIBLE, child.navigationBar?.visibility)
+        assertNotSame(source.webView, child.webView)
+        // 返回根也不能把被替换的 A 当成存活根。
+        MWBActivity.finishToRoot(child)
+        assertTrue(child.isFinishing)
+        assertFalse(previous.isFinishing)
+    }
+
+    @Test fun redirectToDefaultsToHiddenAndRejectsDuplicateLaunches() {
+        val source = activity()
+        val params = JSONObject().put("url", "file:///android_asset/index.html")
+        assertEquals(0, redirect(source, params))
+        assertEquals(-1004, redirect(source, params))
+        var navigateCode = 0
+        NavigationApi(source).navigateTo(params, object : CompletionHandler<Any> {
+            override fun complete(retValue: Any) { navigateCode = (retValue as JSONObject).getInt("errCode") }
+            override fun complete() = Unit
+            override fun setProgressData(value: Any) = Unit
+        })
+        assertEquals(-1004, navigateCode)
+        val shadow = org.robolectric.Shadows.shadowOf(source)
+        val child = Robolectric.buildActivity(MWBActivity::class.java, shadow.nextStartedActivity).setup().get()
+        assertEquals(View.GONE, child.navigationBar?.visibility)
+        assertNull(shadow.nextStartedActivity)
+    }
+
+    @Test fun redirectedRootBecomesTheNewRootForLaterChildren() {
+        // 使用独立的容器注册表验证根替换，避免前例 Activity 干扰根页选择。
+        val containers = MWBActivity::class.java.getDeclaredField("containers").apply { isAccessible = true }
+        (containers.get(null) as MutableList<*>).clear()
+        val source = activity()
+        assertEquals(0, redirect(source, JSONObject().put("url", "file:///android_asset/index.html")))
+        val target = org.robolectric.Shadows.shadowOf(source).nextStartedActivity
+        val newRoot = Robolectric.buildActivity(MWBActivity::class.java, target).setup().get()
+        val child = activity()
+        MWBActivity.finishToRoot(child)
+        assertTrue(source.isFinishing)
+        assertFalse(newRoot.isFinishing)
+        assertTrue(child.isFinishing)
+    }
+
+    @Test fun redirectToRejectsSourceThatAlreadyOpenedAnotherPage() {
+        // startActivity 到 onPause 之间也不能接受替换，否则 B 会返回刚打开的 C。
+        val source = activity()
+        val params = JSONObject().put("url", "file:///android_asset/index.html")
+        var code = Int.MIN_VALUE
+        MWBBridgeAdapter(source).navigateTo(params, object : CompletionHandler<Any> {
+            override fun complete(retValue: Any) { code = (retValue as JSONObject).getInt("errCode") }
+            override fun complete() = Unit
+            override fun setProgressData(value: Any) = Unit
+        })
+        assertEquals(0, code)
+        val shadow = org.robolectric.Shadows.shadowOf(source)
+        assertNotNull(shadow.nextStartedActivity)
+        assertEquals(-1004, redirect(source, params))
+        assertFalse(source.isFinishing)
+        assertNull(shadow.nextStartedActivity)
+    }
+
+    @Test fun redirectToRejectsPausedSourceAndAllowsItAfterReturning() {
+        val config = MWBConfiguration("file:///android_asset/index.html", emptySet())
+        val controller = Robolectric.buildActivity(MWBActivity::class.java,
+            MWBActivity.createIntent(ApplicationProvider.getApplicationContext(), config)).setup()
+        val source = controller.get()
+        val params = JSONObject().put("url", "file:///android_asset/index.html")
+        // 隐藏页的迟到回调不能替换；真正回到来源页后可重新发起。
+        controller.pause()
+        assertEquals(-1004, redirect(source, params))
+        assertFalse(source.isFinishing)
+        assertNull(org.robolectric.Shadows.shadowOf(source).nextStartedActivity)
+        controller.resume()
+        assertEquals(0, redirect(source, params))
+    }
+
+    @Test fun redirectToAllowsSourceAfterNavigatedChildReturns() {
+        val config = MWBConfiguration("file:///android_asset/index.html", emptySet())
+        val controller = Robolectric.buildActivity(MWBActivity::class.java,
+            MWBActivity.createIntent(ApplicationProvider.getApplicationContext(), config)).setup()
+        val source = controller.get()
+        val params = JSONObject().put("url", "file:///android_asset/index.html")
+        MWBBridgeAdapter(source).navigateTo(params, object : CompletionHandler<Any> {
+            override fun complete(retValue: Any) = Unit
+            override fun complete() = Unit
+            override fun setProgressData(value: Any) = Unit
+        })
+        val launched = org.robolectric.Shadows.shadowOf(source).nextStartedActivity
+        val child = Robolectric.buildActivity(MWBActivity::class.java, launched).setup()
+        controller.pause().stop()
+        child.pause().stop().destroy()
+        // 导航互斥只持续到来源页恢复，不能永久禁用它的替换能力。
+        controller.start().resume()
+        assertEquals(0, redirect(source, params))
+    }
+
+    @Test fun redirectToRejectsUnsupportedOptionsAndInvalidFieldsWithoutClosingSource() {
+        // false 同样属于尚未支持的字段；不能悄悄忽略等待参数。
+        for (value in listOf(true, false, JSONObject.NULL)) {
+            val source = activity()
+            assertEquals(-1004, redirect(source, JSONObject().put("url", "file:///android_asset/index.html")
+                .put("waitForReady", value)))
+            assertFalse(source.isFinishing)
+            assertNull(org.robolectric.Shadows.shadowOf(source).nextStartedActivity)
+        }
+        for (params in listOf(JSONObject(), JSONObject().put("url", "https://untrusted.example/"),
+            JSONObject().put("url", "file:///android_asset/index.html").put("hidden", 1),
+            JSONObject().put("url", "file:///android_asset/index.html").put("title", true))) {
+            val source = activity()
+            assertEquals(-1001, redirect(source, params))
+            assertFalse(source.isFinishing)
+            assertNull(org.robolectric.Shadows.shadowOf(source).nextStartedActivity)
+        }
+    }
+
+    @Test fun redirectToRejectsUntrustedSourceBeforeNavigation() {
+        val source = activity()
+        val view = source.webView!!
+        org.robolectric.Shadows.shadowOf(view).webViewClient.onPageStarted(view, "https://untrusted.example/", null)
+        assertEquals(-1006, redirect(source, JSONObject().put("url", "file:///android_asset/index.html")))
+        assertFalse(source.isFinishing)
+        assertNull(org.robolectric.Shadows.shadowOf(source).nextStartedActivity)
+    }
+
+    /** 只替代系统启动边界，用真实桥接处理启动失败和保留原页。 */
+    class FailingRedirectActivity : MWBActivity() {
+        override fun startActivity(intent: android.content.Intent) {
+            throw android.content.ActivityNotFoundException("test launch failure")
+        }
+    }
+
+    @Test fun redirectToKeepsSourceWhenActivityLaunchFails() {
+        val config = MWBConfiguration("file:///android_asset/index.html", emptySet())
+        val source = Robolectric.buildActivity(FailingRedirectActivity::class.java,
+            MWBActivity.createIntent(ApplicationProvider.getApplicationContext(), config)).setup().get()
+        assertEquals(-1002, redirect(source, JSONObject().put("url", "file:///android_asset/index.html")))
+        assertFalse(source.isFinishing)
+        assertNotNull(source.webView)
+    }
+
     @Test fun storageGroupsAndExpiration() {
         val api = StorageApi(activity())
         api.set(JSONObject().put("key", "token").put("data", "A").put("groupName", "one"))

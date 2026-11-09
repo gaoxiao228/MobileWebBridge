@@ -8,6 +8,7 @@
 | --- | --- | --- | --- |
 | `setEnableDebug` | 原生 | 原生 | Android 仅调试构建可开启 |
 | `navigateTo` | 原生 | 原生 | 只允许可信 URL；两端默认隐藏新容器导航栏，可传 `hidden: false` 显示；iOS 另支持 `isPopUp`、`waitForReady`（默认 false，SDK 自动完成主文档加载及绘制准备后转场，最多 3000ms）；Android 应省略 `waitForReady`；其他选项返回 `-1004` |
+| `redirectTo` | 原生（未发布） | 原生（未发布） | 将 `P → A` 替换为 `P → B`，默认隐藏导航栏；iOS 要求空闲导航栈顶，支持可选 `waitForReady`，最多准备 3000ms；Android 必须省略该字段；详见[页面打开与替换](navigation.md) |
 | `navigateBack` | 原生 | 原生 | 结束当前 MWB 页面 |
 | `navigateBackToRoot` | 原生 | 原生 | 返回 MWB 容器根页 |
 | `setNavigationBarTheme` | 原生 | 原生 | 两端支持标题、颜色、显示/隐藏及右上角文字按钮 `actionTxt`；`onActionClick` 留在 JS，点击回传 `actionExt`。Android 另支持返回/关闭按钮及状态栏明暗。`actionIcon` 等未实现字段返回 `-1004` |
@@ -87,7 +88,7 @@
 
 ## 加载状态与首屏就绪
 
-本能力已随配套的 `0.1.3` 提供，并由本轮 `0.1.4` 继续支持。当前 basic 源码共 49 个方法；新增的 `notifyPageReady()` 复用文档身份网关，其他既有 basic 原生方法仍使用各自入口。
+本能力已随配套的 `0.1.3` 提供，并由本轮 `0.1.4` 继续支持。当前 basic 源码共 50 个方法；新增的 `notifyPageReady()` 复用文档身份网关，其他既有 basic 原生方法仍使用各自入口。
 
 | 能力 | iOS | Android |
 | --- | --- | --- |

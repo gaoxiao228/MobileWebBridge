@@ -98,7 +98,7 @@ final class MWBPluginRegistry {
 enum MWBPluginNames {
     static let reserved: Set<String> = Set("""
     notifyPageReady basic version hasPlugin pluginSession pluginInfo invokePlugin pluginEvent Core dispatchEvent backBtnPressed
-    setEnableDebug toast navigateTo navigateBack navigateBackToRoot openExternalBrowser setNavigationBarTheme
+    setEnableDebug toast navigateTo redirectTo navigateBack navigateBackToRoot openExternalBrowser setNavigationBarTheme
     cleanWebviewCache exitApp openNativePage openAppAuthorizeSetting getAppInfoSync setBadgeCount
     getDeviceInfoSync getClipboardDataSync setClipboardData makePhoneCall getNetworkTypeSync
     getNotificationSwitchStatus compressImage scanCode saveImageToPhotosAlbum chooseImage openFile

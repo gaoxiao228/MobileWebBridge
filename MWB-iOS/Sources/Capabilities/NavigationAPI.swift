@@ -30,6 +30,15 @@ extension MWBBridgeAdapter {
     }
 
     @objc func navigateTo(_ arg: Any?, handler: @escaping MWBJSCallback) {
+        navigate(arg, replacingCurrent: false, handler: handler)
+    }
+
+    /// 替换当前导航栈顶，不把旧容器留下供后续返回。
+    @objc func redirectTo(_ arg: Any?, handler: @escaping MWBJSCallback) {
+        navigate(arg, replacingCurrent: true, handler: handler)
+    }
+
+    private func navigate(_ arg: Any?, replacingCurrent: Bool, handler: @escaping MWBJSCallback) {
         guard !rejectUntrusted(handler) else { return }
         guard let params = arg as? [String: Any],
               let text = params["url"] as? String,
@@ -39,10 +48,25 @@ extension MWBBridgeAdapter {
             return
         }
         // 未实现的旧项目参数继续明确拒绝。
-        let unsupported = params.keys.filter { !["url", "title", "hidden", "isPopUp", "waitForReady"].contains($0) }
+        let supported = replacingCurrent ? ["url", "title", "hidden", "waitForReady"] :
+            ["url", "title", "hidden", "isPopUp", "waitForReady"]
+        let unsupported = params.keys.filter { !supported.contains($0) }
         guard unsupported.isEmpty else {
-            respond(.failure(-1004, "Unsupported navigateTo options: \(unsupported.joined(separator: ", "))"), with: handler)
+            let method = replacingCurrent ? "redirectTo" : "navigateTo"
+            respond(.failure(-1004, "Unsupported \(method) options: \(unsupported.joined(separator: ", "))"), with: handler)
             return
+        }
+        // 新接口严格校验基础字段，不改变旧 navigateTo 对历史参数的处理方式。
+        if replacingCurrent {
+            if let title = params["title"], !(title is String) {
+                respond(.failure(-1001, "title must be a string"), with: handler)
+                return
+            }
+            if let hidden = params["hidden"],
+               !(hidden is NSNumber && CFGetTypeID(hidden as CFTypeRef) == CFBooleanGetTypeID()) {
+                respond(.failure(-1001, "hidden must be a boolean"), with: handler)
+                return
+            }
         }
         // NSNumber 的 0/1 不能当成 JSON boolean 接受。
         if let option = params["waitForReady"],
@@ -58,6 +82,14 @@ extension MWBBridgeAdapter {
                 self.respond(.failure(-1004, "Navigation preparation is already pending"), with: handler)
                 return
             }
+            // 没有导航栈时不能降级为 present，否则旧页面仍留在返回路径中。
+            if replacingCurrent {
+                guard let navigation = controller.navigationController,
+                      navigation.topViewController === controller, controller.canStartPreparedNavigation else {
+                    self.respond(.failure(-1004, "Current page cannot be replaced outside an idle navigation stack"), with: handler)
+                    return
+                }
+            }
             let next = MWBWebViewController(configuration: controller.configuration)
             next.host = controller.host
             next.initialPageOverride = url
@@ -65,7 +97,13 @@ extension MWBBridgeAdapter {
             next.title = params["title"] as? String
             let show: (MWBWebViewController) -> Void = { [weak controller] next in
                 guard let controller else { return }
-                if params["isPopUp"] as? Bool == true {
+                if replacingCurrent {
+                    guard let navigation = controller.navigationController,
+                          navigation.topViewController === controller else { return }
+                    // 一次替换栈顶，保留 P；根页面也直接替换，不短暂展示中间页面。
+                    navigation.setViewControllers(Array(navigation.viewControllers.dropLast()) + [next], animated: false)
+                    controller.retireAfterReplacement()
+                } else if params["isPopUp"] as? Bool == true {
                     controller.present(UINavigationController(rootViewController: next), animated: true)
                 } else if let navigationController = controller.navigationController {
                     navigationController.pushViewController(next, animated: true)

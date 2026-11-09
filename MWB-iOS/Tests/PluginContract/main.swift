@@ -81,7 +81,7 @@ try registry.register(name: "echo") {
     created += 1
     let plugin = EchoPlugin(); instances.append(plugin); return plugin
 }
-for name in ["basic", "then", "getStorageSync", "onPageShow", "dispatchEvent", "backBtnPressed", "pluginSession", "Bad", "foo-bar"] {
+for name in ["basic", "redirectTo", "then", "getStorageSync", "onPageShow", "dispatchEvent", "backBtnPressed", "pluginSession", "Bad", "foo-bar"] {
     do { try registry.register(name: name) { EchoPlugin() }; fatalError("reserved name accepted: \(name)") }
     catch {}
 }

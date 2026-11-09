@@ -104,6 +104,12 @@ open class MWBActivity : Activity() {
     private var visibleAtMs: Long? = null
     private var hasBeenVisible = false
     private var hasStartedNavigation = false
+    /** 容器级互斥，不同桥接适配器也不能重复替换同一来源页。 */
+    internal var isRedirecting = false
+    /** 子页启动后到来源重新恢复前，阻止迟到的替换请求插入错误返回路径。 */
+    internal var hasPendingPageNavigation = false
+    internal var isResumedForNavigation = false
+        private set
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -518,8 +524,18 @@ open class MWBActivity : Activity() {
         }
     }
 
-    override fun onResume() { super.onResume(); if (::configuration.isInitialized) sendEvent("appShow") }
-    override fun onPause() { sendEvent("appHide"); super.onPause() }
+    override fun onResume() {
+        super.onResume()
+        // 先释放导航互斥，再通知 H5；返回来源后的 appShow 回调可正常发起替换。
+        isResumedForNavigation = true
+        hasPendingPageNavigation = false
+        if (::configuration.isInitialized) sendEvent("appShow")
+    }
+    override fun onPause() {
+        isResumedForNavigation = false
+        sendEvent("appHide")
+        super.onPause()
+    }
 
     @Deprecated("Uses the Activity back callback for Android API 24 compatibility")
     override fun onBackPressed() {

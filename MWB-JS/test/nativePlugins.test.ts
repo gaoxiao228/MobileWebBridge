@@ -154,7 +154,7 @@ test("plugin events are scoped to a document and unsubscribe stops delivery", as
 test("plugin conflicts and invalid configuration fail during composition", () => {
   nativeHost();
   expect(() => factory.createMWB({ plugins: [payment(), payment()] })).toThrow(/duplicate/i);
-  for (const name of ["basic", "navigateTo", "version", "on", "dispatchEvent", "backBtnPressed", "pluginSession", "__proto__", "bad-name"]) {
+  for (const name of ["basic", "navigateTo", "redirectTo", "version", "on", "dispatchEvent", "backBtnPressed", "pluginSession", "__proto__", "bad-name"]) {
     expect(() => factory.defineNativePlugin<PaymentMethods>()({ name })).toThrow();
   }
   // 旧数组组合也不能覆盖 Core 或事件入口。

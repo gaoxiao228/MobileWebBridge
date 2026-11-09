@@ -48,9 +48,9 @@ class BridgeTest {
     }
 
     @Test fun nativeMethodManifestMatchesContract() {
-        assertEquals(30, MWBBridgeAdapter.nativeMethods.size)
+        assertEquals(31, MWBBridgeAdapter.nativeMethods.size)
         assertTrue(MWBBridgeAdapter.nativeMethods.containsAll(setOf(
-            "getAppInfoSync", "setStorageSync", "chooseImage", "openNativePage")))
+            "getAppInfoSync", "setStorageSync", "chooseImage", "openNativePage", "redirectTo")))
         // 移除能力后不再通过 DSBridge 暴露原生入口。
         assertFalse(MWBBridgeAdapter.nativeMethods.contains("addWaterMark"))
     }

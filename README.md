@@ -26,11 +26,11 @@ iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写
 
 ## 已有能力
 
-当前源码的 `basic` 共 49 个公开方法：30 个既有原生桥入口、1 个通过文档网关调用的首屏就绪方法，以及 18 个 JS 句柄和事件方法。
+当前源码的 `basic` 共 50 个公开方法：31 个原生桥入口、1 个通过文档网关调用的首屏就绪方法，以及 18 个 JS 句柄和事件方法。
 
 | 能力 | 示例 |
 | --- | --- |
-| 容器与导航 | 打开/关闭容器、导航栏样式、右上角文字按钮及点击事件、外部浏览器 |
+| 容器与导航 | 打开/替换/关闭容器、导航栏样式、右上角文字按钮及点击事件、外部浏览器 |
 | 设备与应用 | 设备和应用信息、剪贴板、网络状态、拨号、权限与设置入口 |
 | 媒体与文件 | 选择/压缩图片、扫码、保存图片、Base64 转换、受限文件打开 |
 | 存储 | 同步分组存储、读取、删除、清空 |
@@ -363,7 +363,7 @@ pnpm run sync:native
 | Android | 用 Android Studio 打开 `MWB-Android`，选择 sample 运行；也可在该目录执行 `./gradlew :sample:assembleDebug` 构建 APK |
 | 网页预览 | 在 `MWB-Demo-Web` 执行 `pnpm dev`，访问 `http://127.0.0.1:18743/`；普通浏览器无原生能力 |
 
-Demo 包括 48 方法目录与调试详情、导航栏样式配置页、原生插件调试页，以及顶部白屏/MWB 可调用耗时。原生容器中的 Demo 默认开启 WebView 调试；iOS 可使用 Safari 开发菜单，Android 仅调试构建允许开启。
+Demo 包括 49 方法目录与调试详情、导航栏样式配置页、原生插件调试页，以及顶部白屏/MWB 可调用耗时。原生容器中的 Demo 默认开启 WebView 调试；iOS 可使用 Safari 开发菜单，Android 仅调试构建允许开启。
 
 将 `MWB-Demo-Web/dist/` 整个目录发布到 HTTPS 静态站点，也可作为两端线上联调页。页面及同步方式详见 [Demo Web README](MWB-Demo-Web/README.md)。
 
@@ -371,6 +371,7 @@ Demo 包括 48 方法目录与调试详情、导航栏样式配置页、原生�
 
 - `allowedOrigins` 默认是 iOS 的 `["*"]` / Android 的 `setOf("*")`，省略该参数即可允许所有 HTTP/HTTPS 来源加载并使用原生桥，两端 Demo 同样使用此默认值。需要限制时显式传入完整来源，例如 `https://app.example.com`，不包含路径。仅完整星号有效，不支持子域名通配符；显式空集合仅允许内置本地页面。星号不放宽本地文件、其他协议或系统网络限制。业务插件的网络目标域名策略由宿主另行配置。
 - Android 沿用 DSBridge 的 JavascriptInterface，桥会进入所有 frame，宿主页面不得嵌入不可信 frame。插件 documentId 用于文档生命周期隔离，不能作为防 XSS 的凭证。
+- 当前源码新增 `redirectTo`，将 `P → A` 替换为 `P → B`，B 返回 P；两端支持立即替换，iOS 另支持可选 `waitForReady`。已发布 `0.1.4` 制品不包含此方法，需配套更新 JS 与原生源码，详见[页面打开与替换](docs/navigation.md)。
 - 容器默认禁用双指缩放和正文长按菜单；`navigateTo` 新容器默认隐藏导航栏，需要显示时传 `hidden: false`。导航栏支持右上角文字按钮及 JS 点击回调。
 - 相机、相册、扫码等仍受系统权限和设备能力限制；Android 扫码依赖 Google Play 服务，iOS 的 `exitApp()` 返回不支持。具体差异以兼容表为准。
 

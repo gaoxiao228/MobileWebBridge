@@ -65,6 +65,12 @@ SDK 在离屏的真实目标容器中完成主文档加载、视口布局，再�
 
 成功仍表示已发起导航，不表示系统动画结束。自动判断不依赖 `notifyPageReady()`，也不保证异步接口、懒加载图片、字体或后续业务渲染完成。该选项仅适用于当前 iOS 源码，Android 调用应省略；旧版本能力以对应 Tag 为准。Demo 在 iOS 提供“等待绘制后转场”和“立即转场（对照）”，Android 保持原导航行为。
 
+## 替换当前页面
+
+当前源码新增 `mwb.redirectTo({ url, title?, hidden?, waitForReady? })`：`P → A` 变为 `P → B`，B 返回 P；根页 A 可替换为新根页 B。默认隐藏导航栏并立即替换，不做向前 push 动画；可传 `waitForReady: true` 复用最多 3000ms 的加载与绘制准备，失败保留 A。
+
+第一版支持空闲 `UINavigationController` 的当前栈顶（包括根页和弹窗内导航栈）；无导航控制器、非栈顶、被遮挡或正在转场时返回 `-1004`。新旧容器独立，旧页移除后撤销桥接身份；不要依赖旧页成功回调继续执行业务。此方法未包含在已发布 `0.1.4` 中，详见[页面打开与替换](../docs/navigation.md)。
+
 ## 本地示例
 
 ```bash
@@ -95,7 +101,7 @@ basic 同时支持同步与异步方法：同步方法直接返回值，异步�
 
 工厂、业务入口和 dispose 在主线程执行；网络、文件和计算任务由宿主异步服务执行，UI 操作仍在主线程。完整的立即响应示例、H5 缓存方案、错误与取消处理见 [插件调用方式与线程约定](../docs/native-plugins.md#调用方式与线程约定)，basic 的同步方法清单见 [JS 调用说明](../MWB-JS/README.md#同步与异步调用)。
 
-宿主在第一个容器创建前调用 `try MWB.registerPlugin(name:factory:)`，只提供名字和工厂；不配置 version、methods 或 handle。第一个容器取得快照后注册表锁定；非法名称、重名、覆盖 basic/Core/48 个兼容成员均抛出原生配置错误。`navigateTo` 子容器继承定义快照，但按各自活动主文档惰性创建独立插件实例。共享服务通过工厂闭包注入。
+宿主在第一个容器创建前调用 `try MWB.registerPlugin(name:factory:)`，只提供名字和工厂；不配置 version、methods 或 handle。第一个容器取得快照后注册表锁定；非法名称、重名、覆盖 basic/Core/当前 50 个公开成员均抛出原生配置错误。`navigateTo` 子容器继承定义快照，但按各自活动主文档惰性创建独立插件实例。共享服务通过工厂闭包注入。
 
 ```swift
 // App 启动时注册；已有宿主服务由业务方提供。
@@ -140,7 +146,7 @@ await mwb.network.request({ url: "https://example.com", method: "GET" });
 off(); // 页面卸载时清理订阅。
 ```
 
-`hasPlugin("basic")` 恒为 true；该查询不保证每个业务方法存在，不提供 hasMethod。48 个 basic 方法与兼容根入口保持原有同步/异步性质。原生改动需要重新发布 App；安装 npm 包不能代替原生接入。旧 App 没有插件网关时 H5 明确拒绝为 `-1106`。
+`hasPlugin("basic")` 恒为 true；该查询不保证每个业务方法存在，不提供 hasMethod。当前源码的 50 个 basic 方法与兼容根入口保持原有同步/异步性质。原生改动需要重新发布 App；安装 npm 包不能代替原生接入。旧 App 没有插件网关时 H5 明确拒绝为 `-1106`。
 
 wire 固定为同步 `mwb.pluginSession`、异步 `mwb.pluginInfo` 与 `mwb.invokePlugin`；协议 1 携带原生 documentId，调用另含 plugin/method/params/callId/timeoutMs。事件通过 `mwb.pluginEvent` 的单个消息 `{documentId,plugin,name,data}` 分发。新增错误码为 `-1100` 插件缺失、`-1101` 方法不支持、`-1102` 参数/JSON 非法、`-1103` 超时、`-1104` 文档失效、`-1105` 插件异常、`-1106` 协议不兼容；不可信来源仍为 `-1006`。
 

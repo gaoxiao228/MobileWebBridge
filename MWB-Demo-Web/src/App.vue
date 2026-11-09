@@ -25,7 +25,9 @@ const pageURL = new URL(window.location.href);
 const isContainerChild = pageURL.searchParams.get('mwbChild') === '1';
 const childURL = new URL(pageURL);
 childURL.searchParams.set('mwbChild', '1');
-const context = reactive({ currentURL: childURL.href, platform: 'browser' });
+// 替换示例始终回到主 H5，不携带子页身份或方法详情的 hash。
+const redirectURL = new URL('./index.html', pageURL);
+const context = reactive({ currentURL: childURL.href, redirectURL: redirectURL.href, platform: 'browser' });
 const returning = ref(false);
 const returnError = ref('');
 const environment = ref('浏览器预览');
@@ -338,11 +340,11 @@ function clearEvents() {
 
         <section class="content-section" aria-labelledby="args-heading">
           <div class="section-head"><h3 id="args-heading">调用参数</h3><span>JSON 数组</span></div>
-          <div v-if="active.name === 'navigateTo' && context.platform === 'ios'" class="section-head">
+          <div v-if="['navigateTo', 'redirectTo'].includes(active.name) && context.platform === 'ios'" class="section-head">
             <button type="button" class="quiet-button" :disabled="busy" @click="setNavigationWait(true)">等待绘制后转场</button>
             <button type="button" class="quiet-button" :disabled="busy" @click="setNavigationWait(false)">立即转场（对照）</button>
           </div>
-          <p v-if="active.name === 'navigateTo'" class="method-note">仅 iOS 支持等待绘制，最多 3 秒；失败保留当前页。成功表示已发起导航，异步业务数据可能仍在加载。</p>
+          <p v-if="['navigateTo', 'redirectTo'].includes(active.name)" class="method-note">仅 iOS 支持等待绘制，最多 3 秒；失败保留当前页。成功表示已发起导航，异步业务数据可能仍在加载。</p>
           <label class="sr-only" for="args-input">调用参数 JSON</label>
           <textarea id="args-input" v-model="argsInput" class="args-editor" spellcheck="false" autocomplete="off"></textarea>
           <div v-if="needsImage" class="image-picker">

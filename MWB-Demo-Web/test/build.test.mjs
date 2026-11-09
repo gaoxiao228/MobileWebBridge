@@ -10,6 +10,60 @@ const project = fileURLToPath(new URL('../', import.meta.url));
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const files = ['index.html', 'navigation-theme.html', 'native-plugins.html', 'styles.css', 'demo.js', 'mwb.iife.js', 'plugins.iife.js', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.txt'];
 
+test('替换演示提供 P 打开 A、A 替换 B 和 B 返回的真实调用入口', async () => {
+  // 编译并运行真实 Vue 页面，只替代 WebView 原生桥边界。
+  execFileSync(process.execPath, ['scripts/build.mjs'], { cwd: project, stdio: 'pipe' });
+  const bundle = readFileSync(join(project, 'dist', 'demo.js'), 'utf8');
+  for (const platform of ['ios', 'android']) {
+    for (const stage of ['P', 'A', 'B']) {
+      const dom = new JSDOM('<div id="app"></div>', {
+        url: `file:///android_asset/index.html?mwbRedirect=${stage}`, runScripts: 'outside-only'
+      });
+      const calls = [];
+      let onReturn;
+      dom.window._dsbridge = {};
+      dom.window.mwb = {
+        getDeviceInfoSync: () => ({ osType: platform === 'android' ? 1 : 2 }),
+        navigateTo: async params => { calls.push(['navigateTo', params]); },
+        redirectTo: async params => { calls.push(['redirectTo', params]); },
+        navigateBack: async () => { calls.push(['navigateBack']); },
+        onPageShow: handler => { onReturn = handler; }, offPageShow() {},
+        onAppShow: handler => { onReturn = handler; }, offAppShow() {}
+      };
+      try {
+        dom.window.eval(bundle);
+        // onMounted 的平台探测会触发一次 Vue 更新，再检查平台专有控件。
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(dom.window.document.querySelector('h1')?.textContent, `页面 ${stage}`);
+        const buttons = [...dom.window.document.querySelectorAll('button')];
+        if (stage === 'P') {
+          buttons.find(button => button.textContent === '打开页面 A').click();
+          await new Promise(resolve => setImmediate(resolve));
+          assert.equal(calls[0][0], 'navigateTo');
+          assert.equal(new URL(calls[0][1].url).searchParams.get('mwbRedirect'), 'A');
+          onReturn();
+          await new Promise(resolve => setImmediate(resolve));
+          assert.match(dom.window.document.querySelector('[role="status"]').textContent, /已返回页面 P/);
+        } else if (stage === 'A') {
+          const wait = dom.window.document.querySelector('input[type="checkbox"]');
+          if (platform === 'ios') { assert.ok(wait); wait.click(); }
+          else assert.equal(wait, null);
+          buttons.find(button => button.textContent === '用 B 替换当前 A').click();
+          await new Promise(resolve => setImmediate(resolve));
+          assert.equal(calls[0][0], 'redirectTo');
+          assert.equal(new URL(calls[0][1].url).searchParams.get('mwbRedirect'), 'B');
+          if (platform === 'ios') assert.equal(calls[0][1].waitForReady, true);
+          else assert.equal('waitForReady' in calls[0][1], false);
+        } else {
+          buttons.find(button => button.textContent === '返回页面 P').click();
+          await new Promise(resolve => setImmediate(resolve));
+          assert.equal(calls[0][0], 'navigateBack');
+        }
+      } finally { dom.window.close(); }
+    }
+  }
+});
+
 test('首页不展示错误页入口，保留原生插件入口与方法目录', () => {
   execFileSync(process.execPath, ['scripts/build.mjs'], { cwd: project, stdio: 'pipe' });
   const dom = new JSDOM('<div id="app"></div>', { url: 'file:///android_asset/index.html', runScripts: 'outside-only' });
@@ -24,7 +78,34 @@ test('首页不展示错误页入口，保留原生插件入口与方法目录',
     assert.doesNotMatch(dom.window.document.body.textContent, /默认错误页|自定义错误页/);
     assert.ok(dom.window.document.querySelector('.plugin-entry'));
     assert.ok(dom.window.document.querySelector('#method-search'));
+    assert.equal([...dom.window.document.querySelectorAll('a')].some(link => /mwbRedirect=/.test(link.href)), false);
   } finally { dom.window.close(); }
+});
+
+test('替换当前页面方法行使用主 H5 地址而非子页或独立替换演示', async () => {
+  // 运行编译后的默认参数解析与调用，防止子页标记被带到替换目标。
+  execFileSync(process.execPath, ['scripts/build.mjs'], { cwd: project, stdio: 'pipe' });
+  const bundle = readFileSync(join(project, 'dist', 'demo.js'), 'utf8');
+  for (const osType of [1, 2]) {
+    const dom = new JSDOM('<div id="app"></div>', {
+      url: 'file:///android_asset/index.html?mwbChild=1', runScripts: 'outside-only'
+    });
+    const calls = [];
+    dom.window._dsbridge = {};
+    dom.window.mwb = {
+      getDeviceInfoSync: () => ({ osType }),
+      redirectTo: async params => { calls.push(params); }
+    };
+    try {
+      dom.window.eval(bundle);
+      await new Promise(resolve => setImmediate(resolve));
+      dom.window.document.querySelector('[aria-label="运行替换当前页面"]').click();
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, 'file:///android_asset/index.html');
+      assert.equal('waitForReady' in calls[0], false);
+    } finally { dom.window.close(); }
+  }
 });
 
 test('customError：构建同步自定义模板目录，保留相对 CSS 和脚本', () => {

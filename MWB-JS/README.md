@@ -76,7 +76,7 @@ try {
 
 ### basic 异步方法
 
-既有 21 个 basic 异步原生入口（例如 `toast`、`navigateTo`、`chooseImage`、`scanCode`）返回 `Promise<GenericAsyncResult<T>>`。成功为 `{errCode: 0, result?: T}`；失败拒绝 Promise，不应只在 `.then` 中检查 errCode。
+当前源码的 22 个 basic 异步原生入口（例如 `toast`、`navigateTo`、`redirectTo`、`chooseImage`、`scanCode`）返回 `Promise<GenericAsyncResult<T>>`。成功为 `{errCode: 0, result?: T}`；失败拒绝 Promise，不应只在 `.then` 中检查 errCode。
 
 ```ts
 import { mwb, MWBBridgeError } from "mobile-web-bridge";
@@ -97,11 +97,13 @@ Promise 完成仅表示该方法约定的操作完成：`navigateTo` 默认在�
 
 当前 iOS 源码可传 `await mwb.navigateTo({ url: childURL, waitForReady: true })`，由 SDK 自动等待主文档加载及 WebKit 绘制准备后再发起原系统转场；无需 H5 报告 ready。参数默认 `false`，Android 应省略此参数。总等待 3000 ms，加载/绘制失败或超时拒绝为 `-1002`，源页离开或后台取消为 `-1005`，同源已有准备请求为 `-1004`，非布尔值为 `-1001`。源文档失效后旧回复丢弃。成功不表示动画结束或异步业务数据完成，详见 [iOS 接入说明](../MWB-iOS/README.md)。
 
+当前源码另新增 `redirectTo`，与 `mwb.basic.redirectTo` 共用函数：替换当前容器，返回时跳过旧页。两端可立即替换；`waitForReady` 仅 iOS 支持，Android 必须省略。旧页成功替换后会销毁，后续业务在目标页初始化，不依赖旧页成功回调继续运行；完整参数和平台边界见[页面打开与替换](../docs/navigation.md)。已发布 `0.1.4` 包不包含此方法，需要配套更新原生源码。
+
 除新增 `notifyPageReady()` 外，既有 basic 异步调用没有统一超时及文档失效兜底；原生未回调时可能持续等待。业务添加等待超时只会停止自己的等待，不代表原生操作已取消；支付等操作尤其不能据超时推断业务失败或直接重试。
 
 ### 事件与自定义插件
 
-18 个 JS 句柄/事件方法不属于上述 30 个原生入口。`onAppShow`、`registerHandler` 等注册方法立即返回，回调后续触发；`await mwb.onAppShow(handler)` 不会等待应用进入前台。使用对应 `off` / `unRegister` 方法解绑；插件 `.on()` 返回解绑函数。
+18 个 JS 句柄/事件方法不属于上述 31 个原生入口。`onAppShow`、`registerHandler` 等注册方法立即返回，回调后续触发；`await mwb.onAppShow(handler)` 不会等待应用进入前台。使用对应 `off` / `unRegister` 方法解绑；插件 `.on()` 返回解绑函数。
 
 通过 `defineNativePlugin` 声明的业务方法**只支持 `Promise<GenericAsyncResult<T>>`**。即便原生立即调用 `responder.success`，JS 仍应使用异步契约；不能声明普通对象返回值，也没有 `sync: true` 配置。`hasPlugin` 同样返回 Promise。
 
@@ -109,7 +111,7 @@ Promise 完成仅表示该方法约定的操作完成：`navigateTo` 默认在�
 
 ## 插件组合与构建
 
-当前源码默认提供 basic 的 49 个方法；已发布包为原有 48 个。源码分为 `container`、`device`、`media`、`storage` 四组；事件和 JS 句柄始终包含在 SDK 内。`basicPlugin` 为完整组合，`--plugins=basic` 可构建全量 basic；与旧分组混用时去重。原有 `createMWB(legacyPlugins)` 数组裁剪入口保留，只在 basic 下映射选中的方法。重复方法或覆盖 Core/事件入口的配置直接报错。
+当前源码默认提供 basic 的 50 个方法；已发布包为原有 48 个。源码分为 `container`、`device`、`media`、`storage` 四组；事件和 JS 句柄始终包含在 SDK 内。`basicPlugin` 为完整组合，`--plugins=basic` 可构建全量 basic；与旧分组混用时去重。原有 `createMWB(legacyPlugins)` 数组裁剪入口保留，只在 basic 下映射选中的方法。重复方法或覆盖 Core/事件入口的配置直接报错。
 
 ```bash
 pnpm install
@@ -150,7 +152,7 @@ if (await sdk.hasPlugin("network")) {
 
 调用参数、成功结果和事件只接受 JSON：拒绝循环、函数、undefined 字段、非有限数字、非普通对象或 getter/setter。省略参数按 null 处理；显式结果 null 保留。超时默认 30000ms，允许整数 1..120000ms，超时以 `MWBBridgeError(-1103)` 拒绝。缺插件/方法分别为 `-1100/-1101`，旧壳无网关为 `-1106`，完整错误表见接入文档。
 
-名称采用 `[a-z][a-zA-Z0-9_]*`。插件名不得占用当前 49 个根方法、basic/version/hasPlugin、pluginSession/pluginInfo/invokePlugin/pluginEvent、dispatchEvent/backBtnPressed 或以下探测名。业务方法和事件禁止 `on/then/catch/finally/toJSON/inspect/constructor/prototype/__proto__`；`on` 专用于订阅。读取方法属性不发请求，Proxy 的 Promise/JSON/Symbol 探测不会调用原生。不要通过 `typeof sdk.network.someMethod` 判断原生是否支持该方法，原生才会根据标记方法返回 `-1101`。
+名称采用 `[a-z][a-zA-Z0-9_]*`。插件名不得占用当前 50 个根方法、basic/version/hasPlugin、pluginSession/pluginInfo/invokePlugin/pluginEvent、dispatchEvent/backBtnPressed 或以下探测名。业务方法和事件禁止 `on/then/catch/finally/toJSON/inspect/constructor/prototype/__proto__`；`on` 专用于订阅。读取方法属性不发请求，Proxy 的 Promise/JSON/Symbol 探测不会调用原生。不要通过 `typeof sdk.network.someMethod` 判断原生是否支持该方法，原生才会根据标记方法返回 `-1101`。
 
 ## 接口约定
 

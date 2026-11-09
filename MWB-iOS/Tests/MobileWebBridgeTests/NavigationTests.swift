@@ -4,6 +4,257 @@ import WebKit
 @testable import MobileWebBridge
 
 final class NavigationTests: XCTestCase {
+    func testRedirectDemoThroughRealJavaScriptBridgeReturnsToSameP() throws {
+        // 使用同步到 App 的实际 SDK/H5，覆盖原生桥接、页面身份和完整返回栈。
+        let (window, navigation, previous) = try readyNavigationContext()
+        defer { window.isHidden = true; MWBWebViewPrewarmer.shared.discard() }
+        var parts = URLComponents(url: previous.configuration.initialURL, resolvingAgainstBaseURL: false)!
+        parts.queryItems = [URLQueryItem(name: "mwbRedirect", value: "P")]
+        previous.load(try XCTUnwrap(parts.url))
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in previous.loadState == .loaded }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        let revision = previous.documentRevision
+
+        func script(_ page: MWBWebViewController, _ source: String) {
+            let completed = expectation(description: "real JS bridge invocation")
+            page.webView?.evaluateJavaScript(source) { _, error in
+                XCTAssertNil(error)
+                completed.fulfill()
+            }
+            wait(for: [completed], timeout: 3)
+        }
+        func checkHeading(_ page: MWBWebViewController, _ heading: String) {
+            let checked = expectation(description: "Demo page identity")
+            page.webView?.evaluateJavaScript("document.querySelector('h1').textContent") { value, error in
+                XCTAssertNil(error)
+                XCTAssertEqual(value as? String, heading)
+                checked.fulfill()
+            }
+            wait(for: [checked], timeout: 3)
+        }
+        func capture(_ page: MWBWebViewController, _ name: String) {
+            let captured = expectation(description: "rendered Demo snapshot")
+            let config = WKSnapshotConfiguration()
+            config.afterScreenUpdates = true
+            page.webView?.takeSnapshot(with: config) { image, error in
+                XCTAssertNil(error)
+                if let image {
+                    let attachment = XCTAttachment(image: image)
+                    attachment.name = name
+                    attachment.lifetime = .keepAlways
+                    self.add(attachment)
+                } else { XCTFail("Demo snapshot was unavailable") }
+                captured.fulfill()
+            }
+            wait(for: [captured], timeout: 3)
+        }
+
+        checkHeading(previous, "页面 P")
+        script(previous, """
+            const a = new URL(location.href); a.searchParams.set('mwbRedirect', 'A');
+            void mwb.navigateTo({url: a.href, hidden: true, waitForReady: true});
+            "started";
+            """)
+        let pushed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            navigation.topViewController !== previous && navigation.transitionCoordinator == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [pushed], timeout: 5), .completed)
+        let source = try XCTUnwrap(navigation.topViewController as? MWBWebViewController)
+        checkHeading(source, "页面 A")
+        capture(source, "redirect-A-phone")
+        script(source, """
+            const b = new URL(location.href); b.searchParams.set('mwbRedirect', 'B');
+            void mwb.redirectTo({url: b.href, hidden: true, waitForReady: true});
+            "started";
+            """)
+        let replaced = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            navigation.topViewController !== source && navigation.transitionCoordinator == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [replaced], timeout: 5), .completed)
+        let target = try XCTUnwrap(navigation.topViewController as? MWBWebViewController)
+        XCTAssertEqual(navigation.viewControllers.count, 2)
+        checkHeading(target, "页面 B")
+        capture(target, "redirect-B-phone")
+        script(target, "void mwb.navigateBack(); 'started';")
+        let returned = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            navigation.topViewController === previous && navigation.transitionCoordinator == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 5), .completed)
+        checkHeading(previous, "页面 P")
+        XCTAssertEqual(previous.documentRevision, revision)
+        XCTAssertEqual(navigation.viewControllers.count, 1)
+    }
+
+    func testRedirectReplacesCurrentAndBackSkipsSource() throws {
+        // P 和 A 均真实可见过；替换后返回的是同一个 P 实例。
+        let (window, navigation, previous) = try readyNavigationContext()
+        defer { window.isHidden = true; MWBWebViewPrewarmer.shared.discard() }
+        let source = MWBWebViewController(configuration: previous.configuration)
+        navigation.pushViewController(source, animated: false)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.loadState == .loaded }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+        let replied = expectation(description: "replacement requested")
+        MWBBridgeAdapter(controller: source).redirectTo([
+            "url": source.configuration.initialURL.absoluteString, "title": "B", "hidden": false
+        ]) { value, _ in
+            XCTAssertEqual(MWBResult.parse(value)?.errCode, 0)
+            replied.fulfill()
+        }
+        wait(for: [replied], timeout: 3)
+        let child = try XCTUnwrap(navigation.topViewController as? MWBWebViewController)
+        XCTAssertEqual(navigation.viewControllers.count, 2)
+        XCTAssertTrue(navigation.viewControllers.first === previous)
+        XCTAssertFalse(child === source)
+        XCTAssertEqual(child.title, "B")
+        // UIKit 移除回调尚未结束时，已被替换的 A 也不能继续调用原生能力。
+        XCTAssertFalse(source.isTrusted(source.configuration.initialURL))
+        // 成功代表替换已发起；外观和移除回调由 UIKit 随后完成。
+        let appeared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !navigation.isNavigationBarHidden && source.pluginSession.identity == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [appeared], timeout: 3), .completed)
+        XCTAssertFalse(navigation.isNavigationBarHidden)
+        XCTAssertNil(source.pluginSession.identity)
+        XCTAssertFalse(child.webView === source.webView)
+        let back = expectation(description: "B returns to P")
+        MWBBridgeAdapter(controller: child).navigateBack(nil) { _, _ in back.fulfill() }
+        wait(for: [back], timeout: 3)
+        XCTAssertTrue(navigation.topViewController === previous)
+        XCTAssertEqual(navigation.viewControllers.count, 1)
+    }
+
+    func testRedirectRootDefaultsToImmediateEvenWhenTargetCannotLoad() throws {
+        // 缺失目标也会立即替换，证明默认和 false 没有偷偷等待加载。
+        for explicitFalse in [false, true] {
+            let (window, navigation, source) = try readyNavigationContext()
+            defer { window.isHidden = true }
+            let missing = Bundle.main.resourceURL!.appendingPathComponent("mwb-redirect-missing.html")
+            var params: [String: Any] = ["url": missing.absoluteString]
+            if explicitFalse { params["waitForReady"] = false }
+            let replied = expectation(description: "immediate root replacement")
+            MWBBridgeAdapter(controller: source).redirectTo(params) { value, _ in
+                XCTAssertEqual(MWBResult.parse(value)?.errCode, 0)
+                replied.fulfill()
+            }
+            wait(for: [replied], timeout: 3)
+            XCTAssertEqual(navigation.viewControllers.count, 1)
+            XCTAssertFalse(navigation.topViewController === source)
+            let appeared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                navigation.isNavigationBarHidden
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [appeared], timeout: 3), .completed)
+            XCTAssertTrue(navigation.isNavigationBarHidden)
+            XCTAssertNil(source.pendingNavigation)
+        }
+    }
+
+    func testRedirectWaitsForDrawingAndDisposesSourceDocument() throws {
+        let (window, navigation, source) = try readyNavigationContext()
+        defer { window.isHidden = true; MWBWebViewPrewarmer.shared.discard() }
+        let host = ReadyNavigationHost(delayMs: 200)
+        host.configured = { XCTAssertTrue(navigation.topViewController === source) }
+        source.host = host
+        MWBBridgeAdapter(controller: source).redirectTo([
+            "url": source.configuration.initialURL.absoluteString, "waitForReady": true
+        ]) { _, _ in /* 旧文档销毁后，不依赖它继续处理成功回调。 */ }
+        let replaced = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            navigation.topViewController !== source
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [replaced], timeout: 5), .completed)
+        let child = try XCTUnwrap(navigation.topViewController as? MWBWebViewController)
+        XCTAssertEqual(child.loadState, .loaded)
+        XCTAssertEqual(navigation.viewControllers.count, 1)
+        XCTAssertTrue(child.host === host)
+        XCTAssertNil(source.pendingNavigation)
+        XCTAssertNil(source.pluginSession.identity)
+        XCTAssertFalse(child.webView?.canGoBack ?? true)
+    }
+
+    func testRedirectPreparationFailureAndTimeoutKeepSource() throws {
+        for timeout in [false, true] {
+            let (window, navigation, source) = try readyNavigationContext()
+            defer { window.isHidden = true; MWBWebViewPrewarmer.shared.discard() }
+            let host = ReadyNavigationHost(delayMs: timeout ? 3500 : 0)
+            source.host = host
+            let target = timeout ? source.configuration.initialURL :
+                Bundle.main.resourceURL!.appendingPathComponent("mwb-redirect-failure.html")
+            let failed = expectation(description: "preparation fails without replacing A")
+            MWBBridgeAdapter(controller: source).redirectTo(["url": target.absoluteString, "waitForReady": true]) { value, _ in
+                XCTAssertEqual(MWBResult.parse(value)?.errCode, -1002)
+                failed.fulfill()
+            }
+            wait(for: [failed], timeout: 5)
+            XCTAssertTrue(navigation.topViewController === source)
+            XCTAssertEqual(navigation.viewControllers.count, 1)
+            XCTAssertNil(source.pendingNavigation)
+            XCTAssertNotNil(source.pluginSession.identity)
+            XCTAssertNil(host.child?.pluginSession.identity)
+        }
+    }
+
+    func testRedirectPreparationRejectsConcurrentNavigationAndCancelsOnBackground() throws {
+        let (window, navigation, source) = try readyNavigationContext()
+        defer { window.isHidden = true }
+        let host = ReadyNavigationHost(delayMs: 500)
+        source.host = host
+        let adapter = MWBBridgeAdapter(controller: source)
+        let cancelled = expectation(description: "replacement cancelled")
+        adapter.redirectTo(["url": source.configuration.initialURL.absoluteString, "waitForReady": true]) { value, _ in
+            XCTAssertEqual(MWBResult.parse(value)?.errCode, -1005)
+            cancelled.fulfill()
+        }
+        let duplicate = expectation(description: "navigateTo cannot race replacement")
+        adapter.navigateTo(["url": source.configuration.initialURL.absoluteString]) { value, _ in
+            XCTAssertEqual(MWBResult.parse(value)?.errCode, -1004)
+            duplicate.fulfill()
+        }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: UIApplication.willResignActiveNotification, object: nil)
+        }
+        wait(for: [duplicate, cancelled], timeout: 3)
+        XCTAssertTrue(navigation.topViewController === source)
+        XCTAssertNil(source.pendingNavigation)
+    }
+
+    func testRedirectRejectsInvalidParametersAndMissingNavigation() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "index", withExtension: "html"))
+        let source = MWBWebViewController(configuration: .init(initialURL: url))
+        let adapter = MWBBridgeAdapter(controller: source)
+        let cases: [([String: Any], Int)] = [
+            (["url": url.absoluteString, "hidden": 1], -1001),
+            (["url": url.absoluteString, "waitForReady": "true"], -1001),
+            (["url": url.absoluteString, "title": false], -1001),
+            (["url": url.absoluteString, "isPopUp": true], -1004),
+            (["url": url.absoluteString], -1004),
+            (["url": "javascript:alert(1)"], -1001)
+        ]
+        for (params, expected) in cases {
+            let rejected = expectation(description: "unsupported replacement")
+            adapter.redirectTo(params) { value, _ in
+                XCTAssertEqual(MWBResult.parse(value)?.errCode, expected)
+                rejected.fulfill()
+            }
+            wait(for: [rejected], timeout: 2)
+        }
+        XCTAssertNil(source.presentedViewController)
+    }
+
+    func testRedirectRejectsSourceThatIsNoLongerTheTopPage() throws {
+        // 隐藏的 P 不能把当前 A 替换掉，更不能往自己的位置插入新页。
+        let (window, navigation, previous) = try readyNavigationContext()
+        defer { window.isHidden = true }
+        let current = MWBWebViewController(configuration: previous.configuration)
+        navigation.pushViewController(current, animated: false)
+        let rejected = expectation(description: "hidden source cannot replace top")
+        MWBBridgeAdapter(controller: previous).redirectTo(["url": previous.configuration.initialURL.absoluteString]) { value, _ in
+            XCTAssertEqual(MWBResult.parse(value)?.errCode, -1004)
+            rejected.fulfill()
+        }
+        wait(for: [rejected], timeout: 3)
+        XCTAssertEqual(navigation.viewControllers.count, 2)
+        XCTAssertTrue(navigation.topViewController === current)
+    }
+
     func testNavigateWaitsForDrawingBeforePushAndPreservesHostCallbacks() throws {
         // 目标容器已加载才允许开始push；不要求H5报告业务ready。
         let (window, navigation, root) = try readyNavigationContext()
@@ -26,11 +277,12 @@ final class NavigationTests: XCTestCase {
     }
 
     func testNavigateWithoutWaitStillStartsImmediately() throws {
-        let (window, navigation, root) = try readyNavigationContext()
-        defer { window.isHidden = true }
         // 目标故意不存在：无需依赖 WebKit 与 UIKit 的竞争时序，即可证明默认路径不等待加载成功。
         let missingURL = Bundle.main.resourceURL!.appendingPathComponent("mwb-immediate-missing.html")
         for option in [false, true] {
+            // 各参数使用独立导航上下文，避免上次 pop 的外观回调与下一次 push 重叠。
+            let (window, navigation, root) = try readyNavigationContext()
+            defer { window.isHidden = true }
             let replied = expectation(description: "old immediate behavior")
             var params: [String: Any] = ["url": missingURL.absoluteString]
             if option { params["waitForReady"] = false }
@@ -44,7 +296,6 @@ final class NavigationTests: XCTestCase {
             wait(for: [replied], timeout: 3)
             let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in navigation.transitionCoordinator == nil }, object: nil)
             XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 3), .completed)
-            navigation.popToRootViewController(animated: false)
         }
     }
 

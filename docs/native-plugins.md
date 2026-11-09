@@ -2,7 +2,7 @@
 
 接入方分别实现 iOS、Android 的业务插件，再在 H5 组合有类型的 JS 描述。MWB 负责统一分发、结果、事件、超时和文档生命周期；宿主继续负责自己的网络、支付、登录态及业务权限。注册只有插件名和工厂，没有 version、methods 数组，也不需要业务方实现 handle。
 
-当前源码 49 方法属于 basic（已发布版本为 48），`mwb.basic.xxx()` 与 `mwb.xxx()` 共用函数和状态。业务插件只挂载到自己的命名空间，不覆盖根入口。以下用两个 Demo 已实现的 network 为例；支付插件使用相同机制，但真实支付 SDK、订单校验和结果确认由接入方实现。
+当前源码 50 方法属于 basic（已发布版本为 48），`mwb.basic.xxx()` 与 `mwb.xxx()` 共用函数和状态。业务插件只挂载到自己的命名空间，不覆盖根入口。以下用两个 Demo 已实现的 network 为例；支付插件使用相同机制，但真实支付 SDK、订单校验和结果确认由接入方实现。
 
 ## 调用方式与线程约定
 
@@ -251,7 +251,7 @@ HTML 在业务脚本之前加载 `my-mwb.js`，不要再加载另一个默认脚
 - 工厂按活动文档惰性调用，应快速返回。子容器继承工厂快照，但插件实例独立；共享连接池、登录态通过工厂注入宿主服务。
 - 整页导航/销毁撤销 pending、调用取消和 dispose；暂时隐藏、前后台或 SPA/hash 路由保留实例。旧结果和事件不会进入新文档。
 - 默认超时 30000ms，可配置整数 1..120000ms，包含工厂初始化。JS 也有兜底计时；晚到结果忽略。首版无用户主动取消 API。
-- 名称使用 `[a-z][a-zA-Z0-9_]*`。插件名保护当前 49 个根方法、basic/version/hasPlugin、pluginSession/pluginInfo/invokePlugin/pluginEvent、dispatchEvent/backBtnPressed。插件/方法/事件还避开 `on/then/catch/finally/toJSON/inspect/constructor/prototype/__proto__`。
+- 名称使用 `[a-z][a-zA-Z0-9_]*`。插件名保护当前 50 个根方法、basic/version/hasPlugin、pluginSession/pluginInfo/invokePlugin/pluginEvent、dispatchEvent/backBtnPressed。插件/方法/事件还避开 `on/then/catch/finally/toJSON/inspect/constructor/prototype/__proto__`。
 - `.on()` 返回解绑函数，不启动原生业务、不重放事件。`context.emit` 仅发往本插件的当前文档，不能指定其他容器。
 
 两端仅加载自己控制的可信页面。iOS 新网关拒绝 iframe；Android 的 DSBridge JavascriptInterface 暴露给所有 frame，不能嵌入不可信 frame。documentId 用于文档生命周期隔离，不能防同页恶意脚本或 XSS。生产插件还需执行宿主自己的账号、业务权限和参数校验。

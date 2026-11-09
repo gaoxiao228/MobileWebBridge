@@ -10,6 +10,8 @@ export const containerPlugin = {
     setEnableDebug(enabled) { callSync("setEnableDebug", { enabled }); },
     toast(param) { return callAsync("toast", param); },
     navigateTo(param) { return callAsync("navigateTo", param); },
+    // 替换由原生一次完成，JS 不拼接打开和关闭操作。
+    redirectTo(param) { return callAsync("redirectTo", param); },
     navigateBack(callbackInfo) { return callAsync("navigateBack", callbackInfo); },
     navigateBackToRoot() { return callAsync("navigateBackToRoot"); },
     openExternalBrowser(param) { return callAsync("openExternalBrowser", param); },
@@ -18,7 +20,7 @@ export const containerPlugin = {
     exitApp() { return callAsync("exitApp"); },
     openNativePage(param) { return callAsync("openNativePage", param); }
   } satisfies Pick<MWBJSSDK,
-    "notifyPageReady" | "setEnableDebug" | "toast" | "navigateTo" | "navigateBack" |
+    "notifyPageReady" | "setEnableDebug" | "toast" | "navigateTo" | "redirectTo" | "navigateBack" |
     "navigateBackToRoot" | "openExternalBrowser" | "setNavigationBarTheme" |
     "cleanWebviewCache" | "exitApp" | "openNativePage">
 } as const;

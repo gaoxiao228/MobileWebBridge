@@ -80,9 +80,15 @@ dependencies { implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.4") }
 
 示例 App 启动后直接从 `android_asset` 加载网页，首页隐藏空导航栏，与 iOS 示例一致。`navigateTo` 新页面默认隐藏导航栏；传 `hidden: false` 可显示标题和返回按钮。页面源码由上级 `MWB-Demo-Web` 统一维护。更新页面或 JS SDK 后，在 `MWB-Demo-Web` 执行 `npm run sync:native`，再重新构建示例 App。SDK 方法及平台差异见 [兼容表](../docs/compatibility.md)。
 
+## 替换当前页面
+
+当前源码新增 `mwb.redirectTo({ url, title?, hidden? })`，将 `P → A` 替换为 `P → B`；启动 B 后结束 A，B 返回时跳过 A。新容器默认隐藏导航栏，不使用向前滑入动画；启动请求失败保留 A，成功后的网页加载失败由 B 展示错误页。根 A 替换后 B 成为新根页。
+
+Android 暂不实现 `waitForReady`，该字段必须省略，显式传入 `false` 也返回 `-1004`。此方法未包含在已发布 `0.1.4` 中，需要同步更新 JS 和原生源码；两端 Demo 提供 P/A/B 操作入口，详见[页面打开与替换](../docs/navigation.md)。
+
 ## 自定义原生插件
 
-现有 48 方法统一属于 `basic`：H5 的 `mwb.basic.navigateTo()` 与兼容的 `mwb.navigateTo()` 使用同一实现，同步存储仍是同步调用。自定义插件首版只支持异步，不会覆盖 basic。
+当前源码的 50 个方法统一属于 `basic`：H5 的 `mwb.basic.navigateTo()` 与兼容的 `mwb.navigateTo()` 使用同一实现，同步存储仍是同步调用。自定义插件首版只支持异步，不会覆盖 basic。
 
 basic 同步方法直接返回值，异步方法返回 Promise；不是每个方法都能任选同步/异步模式。自定义插件即使立即得到内存数据，仍保持 `Any? / MWBPluginCallContext / MWBPluginResponder -> Unit` 签名，通过 responder 响应，H5 使用 await；不能改成返回业务对象、Future 或 `suspend` 方法。
 
@@ -122,7 +128,7 @@ class NetworkPlugin(private val service: AppNetworkService) : MWBPlugin() {
 
 JSON 支持 null、布尔、有限数值、字符串、`JSONObject`/`JSONArray`、字符串键 `Map` 和 `List`。循环、非有限数字或任意原生对象返回 `-1102`。省略参数按 JSON null 传入；`success()` 省略 result，`success(null)` 保留 `result: null`。响应器允许从后台线程调用并保证一次完成。默认超时 30000ms，允许 1..120000ms，包含工厂创建时间；超时、主文档导航、销毁调用 `onCancel`，丢弃晚到结果。`context.activity` 仅在当前可信文档有效时提供可空 Activity，业务不应长期持有它。
 
-注册表在首个容器创建时冻结，拒绝后续注册或重名；子容器继承同一份不可变定义，但插件实例独立。插件名、方法名、事件名采用 `[a-z][a-zA-Z0-9_]*`；插件名不能占用 basic、version、48 个根方法或 Core 成员；业务方法和事件避开 on/then/catch/finally/toJSON/inspect/constructor/prototype/__proto__。事件只投递到发起调用的当前可信文档，不缓存或跨容器广播。
+注册表在首个容器创建时冻结，拒绝后续注册或重名；子容器继承同一份不可变定义，但插件实例独立。插件名、方法名、事件名采用 `[a-z][a-zA-Z0-9_]*`；插件名不能占用 basic、version、当前 50 个根方法或 Core 成员；业务方法和事件避开 on/then/catch/finally/toJSON/inspect/constructor/prototype/__proto__。事件只投递到发起调用的当前可信文档，不缓存或跨容器广播。
 
 内部 wire 使用同步 `mwb.pluginSession` 获取 `{protocol:1,documentId}`，异步 `mwb.pluginInfo`、`mwb.invokePlugin` 校验同一身份，原生事件走 `mwb.pluginEvent`。这些入口由 SDK 管理，宿主无需手写调用。文档令牌不能隔离同源脚本或防止 XSS，来源与 frame 安全边界沿用前文说明。桥错误为 `-1006` 不可信、`-1100` 缺插件、`-1101` 缺方法、`-1102` 参数/JSON 错误、`-1103` 超时、`-1104` 文档失效、`-1105` 插件异常、`-1106` 协议不兼容。
 

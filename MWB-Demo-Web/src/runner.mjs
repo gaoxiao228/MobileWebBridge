@@ -10,6 +10,7 @@ const placeholders = {
   '{{imageBase64}}': ['imageBase64', '请先选择图片。'],
   '{{imagePath}}': ['imagePath', '请先执行“选择图片”。'],
   '{{currentURL}}': ['currentURL', '当前示例页地址不可用。'],
+  '{{redirectURL}}': ['redirectURL', '替换示例目标地址不可用。'],
   '{{phoneNumber}}': ['phoneNumber', '请在参数中填写要拨打的电话号码。'],
   '{{pdfURL}}': ['pdfURL', '请在参数中填写可访问的 HTTPS PDF 地址。']
 };
@@ -49,7 +50,7 @@ export function resolveArgs(example, input, context = {}) {
   if (example.name === 'convertImagePathToBase64') requiredString('path', '图片路径');
   if (example.name === 'openFile') requiredString('url', 'PDF 地址');
   if (example.name === 'makePhoneCall') requiredString('phoneNumber', '电话号码');
-  if (example.name === 'navigateTo') {
+  if (['navigateTo', 'redirectTo'].includes(example.name)) {
     requiredString('url', '页面地址');
     args[0] = navigationOptions(first, context.platform);
   }
