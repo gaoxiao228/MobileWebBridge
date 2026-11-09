@@ -1,14 +1,14 @@
 # 版本、支持范围与升级
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。本轮目标版本为 `0.1.5`，Git Tag、npm 与 Maven Central 制品状态待核验；安装示例已同步本轮版本，也支持本地源码接入。此前 `0.1.4` 已公开并通过公共仓库消费及独立 Pod 接入验证。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前版本为 `0.1.5`，Git Tag、npm 与 Maven Central 制品已公开；2026-11-09 已通过 npm/Maven 公共仓库独立消费及 iOS Tag 源码的独立 Pod Release 接入验证。安装示例固定本轮版本，也支持本地源码接入。此前 `0.1.4` 已公开并通过公共仓库消费及独立 Pod 接入验证。
 
 ## 当前状态
 
-| 组件 | 本轮版本 | 获取方式与状态 |
+| 组件 | 当前版本 | 获取方式与状态 |
 | --- | --- | --- |
-| JS SDK | `0.1.5` | npm 待发布与核验；可从源码构建 |
-| iOS | `0.1.5` | 共享源码 Tag 待推送；可用本地 Pod；未发布公共 CocoaPods Specs |
-| Android | `0.1.5` | Maven Central 待发布与核验；可用源码与本地 Maven |
+| JS SDK | `0.1.5` | npm 已公开，latest 为 0.1.5；公共安装验证通过 |
+| iOS | `0.1.5` | 共享源码 Tag / 本地 Pod；Tag 的独立 Pod Release 接入验证通过，未发布公共 CocoaPods Specs |
+| Android | `0.1.5` | Maven Central 已公开，公共 Release 消费验证通过；支持源码与本地 Maven |
 | Demo Web | `0.1.5` | 与本轮 SDK 配套，构建号 5；不是独立发布的 SDK |
 
 `0.1.5` 新增 `redirectTo`：将 `P → A` 替换为 `P → B`，支持根页替换。iOS 可传 `waitForReady: true`，最多准备 3000 ms，失败保留来源页；第一版要求空闲导航栈顶。Android 立即替换，必须省略该字段。旧页销毁后业务由 B 自己初始化，完整契约见[页面打开与替换](navigation.md)。
@@ -37,7 +37,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | 共享 Git Tag | iOS Pod 版本 | Android Maven 版本 | JS npm 版本 | 状态 |
 | --- | --- | --- | --- | --- |
-| `0.1.5` | `0.1.5` | `0.1.5` | `0.1.5` | 本轮待推送及公开消费核验 |
+| `0.1.5` | `0.1.5` | `0.1.5` | `0.1.5` | GitHub Tag、npm 与 Maven Central 已公开；iOS Git Pod Release 接入验证通过 |
 | `0.1.4` | `0.1.4` | `0.1.4` | `0.1.4` | GitHub Tag、npm 与 Maven Central 已公开；iOS Tag 源码的独立 Pod 接入验证通过 |
 | `0.1.3` | `0.1.3` | `0.1.3` | `0.1.3` | GitHub Tag、npm 与 Maven Central 已公开；iOS Git Pod 验证通过 |
 | `0.1.1` | `0.1.0` | `0.1.1` | `0.1.1-beta.1` | Android Maven 已发布，含加载与就绪回调；H5 仍需当前 JS 源码，iOS 未发布公共 Specs |

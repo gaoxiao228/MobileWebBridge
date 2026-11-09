@@ -6,7 +6,7 @@
 - iOS `redirectTo` 支持可选 `waitForReady`，最多准备 3000ms，失败保留来源页；第一版要求来源位于空闲导航栈顶。Android 立即替换，必须省略 `waitForReady`。
 - 两端共享 Demo 新增 `redirectTo` 方法行，默认替换到主 H5 页面；同步接口类型、插件命名保护和接入说明。
 
-- JS、iOS、Android 与 Demo 版本统一为 `0.1.5`，Demo 构建号递增为 5；公开制品状态待核验。
+- JS、iOS、Android 与 Demo 版本统一为 `0.1.5`，Demo 构建号递增为 5；npm 与 Maven Central 制品已公开，公共仓库独立消费验证通过；iOS Tag 源码的独立 Pod Release 接入验证通过。
 
 ## 0.1.4 — 2026-11-07
 
