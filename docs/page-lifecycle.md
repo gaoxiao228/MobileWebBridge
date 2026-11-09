@@ -1,6 +1,6 @@
 # 容器加载状态与首屏就绪
 
-本页能力已包含在 **Android Maven `0.1.1`** 中。本轮请配套使用 JS/iOS/Android `0.1.4`，此前 `0.1.3` 亦已提供加载与首屏通知；已发布的 JS `0.1.1-beta.1` 和旧 iOS/Android `0.1.0` 不包含此能力。仅升级 JS 不能为旧 App 增加原生实现。
+本页能力已包含在 **Android Maven `0.1.1`** 中。本轮请配套使用 JS/iOS/Android `0.1.5`，此前 `0.1.3` 亦已提供加载与首屏通知；已发布的 JS `0.1.1-beta.1` 和旧 iOS/Android `0.1.0` 不包含此能力。仅升级 JS 不能为旧 App 增加原生实现。
 
 每个容器分别提供 `onLoadStateChange`、`onPageReady`、只读 `loadState` 和 `isPageReady`。回调在主线程执行，没有历史重放；晚注册可读取当前状态。加载状态相同时不重复通知，连续两次整页加载如果一直处于 loading，不额外产生一次 loading 回调。
 

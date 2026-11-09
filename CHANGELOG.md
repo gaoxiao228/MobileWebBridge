@@ -1,10 +1,12 @@
 # 更新记录
 
-## 未发布
+## 0.1.5 — 2026-11-09
 
 - JS、iOS、Android 新增 `redirectTo`：将 `P → A` 替换为 `P → B`，新容器默认隐藏导航栏，支持替换根页面；原 `navigateTo` 保留新增页面行为。
 - iOS `redirectTo` 支持可选 `waitForReady`，最多准备 3000ms，失败保留来源页；第一版要求来源位于空闲导航栈顶。Android 立即替换，必须省略 `waitForReady`。
 - 两端共享 Demo 新增 `redirectTo` 方法行，默认替换到主 H5 页面；同步接口类型、插件命名保护和接入说明。
+
+- JS、iOS、Android 与 Demo 版本统一为 `0.1.5`，Demo 构建号递增为 5；公开制品状态待核验。
 
 ## 0.1.4 — 2026-11-07
 

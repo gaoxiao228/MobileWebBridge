@@ -1,19 +1,21 @@
 # 版本、支持范围与升级
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前版本为 `0.1.4`，Git Tag、npm 与 Maven Central 制品已公开；2026-11-07 已通过 npm/Maven 公共仓库独立消费及 iOS Tag 源码的独立 Pod 接入验证。此前 `0.1.3` 已公开。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。本轮目标版本为 `0.1.5`，Git Tag、npm 与 Maven Central 制品状态待核验；安装示例已同步本轮版本，也支持本地源码接入。此前 `0.1.4` 已公开并通过公共仓库消费及独立 Pod 接入验证。
 
 ## 当前状态
 
-| 组件 | 当前版本 | 获取方式与状态 |
+| 组件 | 本轮版本 | 获取方式与状态 |
 | --- | --- | --- |
-| JS SDK | `0.1.4` | npm 已公开，latest 为 0.1.4；公共安装验证通过 |
-| iOS | `0.1.4` | 共享源码 Tag / 本地 Pod，Tag 源码的独立 Pod 接入验证通过；未发布公共 CocoaPods Specs |
-| Android | `0.1.4` | Maven Central 已公开，公共 Release 消费验证通过 |
-| Demo Web | `0.1.4` | 与本轮 SDK 配套，不是独立发布的 SDK；页面可静态部署 |
+| JS SDK | `0.1.5` | npm 待发布与核验；可从源码构建 |
+| iOS | `0.1.5` | 共享源码 Tag 待推送；可用本地 Pod；未发布公共 CocoaPods Specs |
+| Android | `0.1.5` | Maven Central 待发布与核验；可用源码与本地 Maven |
+| Demo Web | `0.1.5` | 与本轮 SDK 配套，构建号 5；不是独立发布的 SDK |
 
-`0.1.4` 在既有 HTML 错误页、业务首页回调和默认星号来源配置上，新增 iOS 默认 WebView 自动预热和按次 `navigateTo({ url, waitForReady: true })`。等待由 SDK 自动判断主文档加载及绘制准备，最长 3000 ms；失败保留源页，不等同于异步业务数据完成。Android 不提供这两个选项，调用时应省略 `waitForReady`。详见 [iOS 接入说明](../MWB-iOS/README.md)。
+`0.1.5` 新增 `redirectTo`：将 `P → A` 替换为 `P → B`，支持根页替换。iOS 可传 `waitForReady: true`，最多准备 3000 ms，失败保留来源页；第一版要求空闲导航栈顶。Android 立即替换，必须省略该字段。旧页销毁后业务由 B 自己初始化，完整契约见[页面打开与替换](navigation.md)。
 
-安装示例固定使用 `0.1.4`，也支持本地源码接入。核实实时 npm 状态可运行：
+继续保留 `0.1.4` 的 iOS 默认 WebView 自动预热与可选导航绘制准备，以及既有 HTML 错误页、业务首页回调和默认星号来源配置。自动准备不代表异步业务数据已完成。
+
+安装示例固定使用 `0.1.5`。核实实时 npm 状态可运行：
 
 ```bash
 npm view mobile-web-bridge dist-tags versions --json --registry=https://registry.npmjs.org/
@@ -25,7 +27,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | H5 SDK | iOS / Android 源码 | 插件协议 | 范围 |
 | --- | --- | --- | --- |
-| `0.1.4` | iOS / Android `0.1.4` | `1` | basic、原生插件、首屏通知、错误页；iOS 另含自动预热与等待绘制后转场 |
+| `0.1.5` | iOS / Android `0.1.5` | `1` | basic、原生插件、首屏通知、错误页及页面替换；iOS 另含自动预热与等待绘制后转场 |
 
 该表描述源码和自动化检查覆盖的组合，不是对所有设备/WebView 的兼容认证。宿主仍需按目标设备验证实际业务；iOS 系统弹层呈现时仍可能调整安全区和布局。
 
@@ -35,11 +37,12 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | 共享 Git Tag | iOS Pod 版本 | Android Maven 版本 | JS npm 版本 | 状态 |
 | --- | --- | --- | --- | --- |
+| `0.1.5` | `0.1.5` | `0.1.5` | `0.1.5` | 本轮待推送及公开消费核验 |
 | `0.1.4` | `0.1.4` | `0.1.4` | `0.1.4` | GitHub Tag、npm 与 Maven Central 已公开；iOS Tag 源码的独立 Pod 接入验证通过 |
 | `0.1.3` | `0.1.3` | `0.1.3` | `0.1.3` | GitHub Tag、npm 与 Maven Central 已公开；iOS Git Pod 验证通过 |
 | `0.1.1` | `0.1.0` | `0.1.1` | `0.1.1-beta.1` | Android Maven 已发布，含加载与就绪回调；H5 仍需当前 JS 源码，iOS 未发布公共 Specs |
 
-共享 Tag 是仓库源码标识，各端已发布版本不得覆盖。当前配套源码版本为 `0.1.4`，Podspec 的 `s.source[:tag]` 对应共享 Tag `0.1.4`，支持 Git Pod 或本地源码接入。历史 Tag `0.1.2` 已移除，npm `0.1.2` 包继续保留；既有共享 Tag `0.1.1` 保留。Maven 坐标中的版本和 npm 包版本按本表记录，不由 Git Tag 自动修改。
+共享 Tag 是仓库源码标识，各端已发布版本不得覆盖。当前配套源码版本为 `0.1.5`，Podspec 的 `s.source[:tag]` 对应共享 Tag `0.1.5`，支持 Git Pod 或本地源码接入。历史 Tag `0.1.2` 已移除，npm `0.1.2` 包继续保留；既有共享 Tag `0.1.1` 保留。Maven 坐标中的版本和 npm 包版本按本表记录，不由 Git Tag 自动修改。
 
 npm 的 `latest`、`next` 是包分发标签，与 Git Tag 分开管理，不需要因此再创建 JS 专属的 Git Tag。
 

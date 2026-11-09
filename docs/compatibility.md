@@ -2,13 +2,13 @@
 
 当前源码的 iOS/Android 容器均新增默认本地 HTML 错误页、自定义模板、重试、`onGoHome` 与宿主 `configureContainer`；旧 Pod `0.1.0` 和 Maven `0.1.1` 不包含这些能力。错误页属于原生容器能力，不增加业务 JS 方法，详见 [错误页接入](error-pages.md)。
 
-此表以 JS、iOS 和 Android 的 `0.1.4` 源码及插件协议 1 为基准；npm/Maven 制品已公开，并通过公共仓库独立消费验证，历史版本和环境边界见 [版本说明](versioning.md)。`0` 为成功；`-1001` 参数错误、`-1002` 操作失败、`-1003` 方法缺失、`-1004` 平台不支持、`-1005` 宿主能力未配置、`-1006` 页面不可信、`-1007` 用户取消、`-1008` 权限拒绝或操作忙。异步方法返回 `{errCode, result?, errorMsg?}`；失败的 JS Promise 会拒绝。
+此表以 JS、iOS 和 Android 的 `0.1.5` 源码及插件协议 1 为基准；本轮 npm/Maven 制品状态待核验，历史版本和环境边界见 [版本说明](versioning.md)。`0` 为成功；`-1001` 参数错误、`-1002` 操作失败、`-1003` 方法缺失、`-1004` 平台不支持、`-1005` 宿主能力未配置、`-1006` 页面不可信、`-1007` 用户取消、`-1008` 权限拒绝或操作忙。异步方法返回 `{errCode, result?, errorMsg?}`；失败的 JS Promise 会拒绝。
 
 | 方法 | iOS | Android | 备注 |
 | --- | --- | --- | --- |
 | `setEnableDebug` | 原生 | 原生 | Android 仅调试构建可开启 |
 | `navigateTo` | 原生 | 原生 | 只允许可信 URL；两端默认隐藏新容器导航栏，可传 `hidden: false` 显示；iOS 另支持 `isPopUp`、`waitForReady`（默认 false，SDK 自动完成主文档加载及绘制准备后转场，最多 3000ms）；Android 应省略 `waitForReady`；其他选项返回 `-1004` |
-| `redirectTo` | 原生（未发布） | 原生（未发布） | 将 `P → A` 替换为 `P → B`，默认隐藏导航栏；iOS 要求空闲导航栈顶，支持可选 `waitForReady`，最多准备 3000ms；Android 必须省略该字段；详见[页面打开与替换](navigation.md) |
+| `redirectTo` | 原生（0.1.5 起） | 原生（0.1.5 起） | 将 `P → A` 替换为 `P → B`，默认隐藏导航栏；iOS 要求空闲导航栈顶，支持可选 `waitForReady`，最多准备 3000ms；Android 必须省略该字段；详见[页面打开与替换](navigation.md) |
 | `navigateBack` | 原生 | 原生 | 结束当前 MWB 页面 |
 | `navigateBackToRoot` | 原生 | 原生 | 返回 MWB 容器根页 |
 | `setNavigationBarTheme` | 原生 | 原生 | 两端支持标题、颜色、显示/隐藏及右上角文字按钮 `actionTxt`；`onActionClick` 留在 JS，点击回传 `actionExt`。Android 另支持返回/关闭按钮及状态栏明暗。`actionIcon` 等未实现字段返回 `-1004` |
@@ -88,7 +88,7 @@
 
 ## 加载状态与首屏就绪
 
-本能力已随配套的 `0.1.3` 提供，并由本轮 `0.1.4` 继续支持。当前 basic 源码共 50 个方法；新增的 `notifyPageReady()` 复用文档身份网关，其他既有 basic 原生方法仍使用各自入口。
+本能力已随配套的 `0.1.3` 提供，并由本轮 `0.1.5` 继续支持。当前 basic 源码共 50 个方法；新增的 `notifyPageReady()` 复用文档身份网关，其他既有 basic 原生方法仍使用各自入口。
 
 | 能力 | iOS | Android |
 | --- | --- | --- |
