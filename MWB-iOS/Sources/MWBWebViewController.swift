@@ -415,6 +415,12 @@ open class MWBWebViewController: UIViewController {
     }
 
     private func styleActionButton(_ item: UIBarButtonItem) {
+        // 只隐藏 UIKit 绘制的玻璃底，保留原生控件、点击区域与事件。
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), let visible = navigationStyle.buttonBackgroundVisible {
+            item.hidesSharedBackground = !visible
+        }
+        #endif
         item.tintColor = navigationStyle.buttonColor ?? navigationStyle.titleColor ?? navigationBarState?.tintColor
         item.customView?.tintColor = item.tintColor
         if let font = navigationStyle.buttonFont(traits: traitCollection) {
@@ -443,10 +449,9 @@ open class MWBWebViewController: UIViewController {
         navigationActionExt = ext
         navigationActionRevision = documentRevision
         if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            navigationItem.rightBarButtonItem = UIBarButtonItem(
-                title: title, style: .plain, target: self, action: #selector(handleNavigationAction)
-            )
-            if let item = navigationItem.rightBarButtonItem { styleActionButton(item) }
+            let item = UIBarButtonItem(title: title, style: .plain, target: self, action: #selector(handleNavigationAction))
+            styleActionButton(item)
+            navigationItem.rightBarButtonItem = item
         } else {
             navigationItem.rightBarButtonItem = nil
         }

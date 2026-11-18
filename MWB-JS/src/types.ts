@@ -50,6 +50,8 @@ export type NavigationBarAppearanceOptions = {
 	titleColor?: string;
 	/** 显式指定后，后续 titleColor 更新不再影响按钮。 */
 	buttonColor?: string;
+	/** 仅 iOS（26 起生效）：false 隐藏系统按钮背景，true 恢复系统样式；Android 请省略。 */
+	buttonBackgroundVisible?: boolean;
 	backButtonStyle?: "text" | "arrow" | "arrowText";
 	/** 默认“返回”；不能是空白字符串。 */
 	backButtonText?: string;

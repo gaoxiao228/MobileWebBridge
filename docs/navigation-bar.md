@@ -27,6 +27,7 @@ void mwb.redirectTo(options).catch(console.error);
 | color | 6 位十六进制，可带 # | 不透明背景色 |
 | titleColor | 同上 | 标题色；未显式配置按钮色时仍同时影响按钮 |
 | buttonColor | 同上 | 返回箭头/文字、关闭及右侧操作的独立颜色 |
+| buttonBackgroundVisible | boolean（仅 iOS） | `false` 去掉返回和右侧操作的系统玻璃底，`true` 恢复；iOS 26 起生效，Android 请省略 |
 | backButtonStyle | text / arrow / arrowText | 原生文字、箭头、箭头加文字 |
 | backButtonText | 非空白 string | 返回文案，默认“返回”，箭头模式仍使用此可访问名称 |
 | showBackButton | boolean | 返回控件显隐，不改变系统返回或真实页面栈 |
@@ -37,6 +38,8 @@ void mwb.redirectTo(options).catch(console.error);
 | buttonFontSize | 有限 number，0 < size <= 28 | 原生文字按钮基准字号 |
 
 缺省字段保留当前值，undefined 不传原生。新增字段的 null、错误类型、非法色值/枚举/字号返回 `-1001`，整次不应用；打开/替换会在创建目标前拒绝无效外观。不支持的其他打开参数仍为 `-1004`。iOS 无导航控制器且未指定 isPopUp=true 时，带外观的 navigateTo 返回 `-1004`。
+
+在 iOS 26 及更新版本中，可用 `await mwb.setNavigationBarTheme({ buttonBackgroundVisible: false })` 隐藏当前页两个按钮的背景。`navigateTo` 和 `redirectTo` 传相同字段可在目标首帧隐藏背景。省略时遵循默认外观或保留当前页已有设置，按钮颜色、点击热区和回调保持原有行为。深色栏可搭配较亮的 `buttonColor`，例如 `#74E1D5`。
 
 ## 合并与兼容
 
@@ -62,7 +65,8 @@ MWBConfiguration 的可选 navigationBarAppearance 被新容器继承，不包�
 let appearance = MWBNavigationBarAppearance(
     color: .systemBackground, titleColor: .label, buttonColor: .systemTeal,
     backButtonStyle: .arrowText, backButtonText: "返回", separatorVisible: true,
-    titleFontSize: 17, titleFontWeight: .semibold, buttonFontSize: 16)
+    titleFontSize: 17, titleFontWeight: .semibold, buttonFontSize: 16,
+    buttonBackgroundVisible: false)
 let configuration = MWBConfiguration(initialURL: url, navigationBarAppearance: appearance)
 let page = MWBWebViewController(configuration: configuration)
 ```

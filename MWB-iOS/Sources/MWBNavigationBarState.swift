@@ -29,7 +29,7 @@ struct MWBNavigationBarSnapshot {
     }
 
     mutating func apply(_ style: MWBNavigationBarAppearance, traits: UITraitCollection) {
-        guard !style.isEmpty else { return }
+        guard style.hasSharedBarStyle else { return }
         func update(_ original: UINavigationBarAppearance) -> UINavigationBarAppearance {
             let result = original.copy()
             if let color = style.color {

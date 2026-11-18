@@ -8,7 +8,7 @@ final class NavigationTests: XCTestCase {
         // 真实 H5 配置页发起替换，并保存包含导航栏的完整窗口截图。
         let (window, navigation, root) = try readyNavigationContext()
         defer { window.isHidden = true; MWBWebViewPrewarmer.shared.discard() }
-        XCTAssertEqual(theme(root, ["hidden": false, "title": "根页", "buttonColor": "008800"]), 0)
+        XCTAssertEqual(theme(root, ["hidden": false, "title": "根页", "buttonColor": "008800", "actionTxt": "添加"]), 0)
         let url = root.configuration.initialURL.deletingLastPathComponent().appendingPathComponent("navigation-theme.html")
         func script(_ page: MWBWebViewController, _ source: String) {
             let done = expectation(description: "real Demo interaction")
@@ -31,13 +31,32 @@ final class NavigationTests: XCTestCase {
             let attachment = XCTAttachment(image: image)
             attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
         }
-        script(root, "void mwb.navigateTo({url:'\(url.absoluteString)',title:'初始样式',hidden:false,color:'f6fbfa',titleColor:'0b4148',buttonColor:'049f91',backButtonStyle:'arrowText',titleFontSize:17,buttonFontSize:16}); 'started';")
+        script(root, "void mwb.navigateTo({url:'\(url.absoluteString)',title:'初始样式',hidden:false,color:'f6fbfa',titleColor:'0b4148',buttonColor:'049f91',buttonBackgroundVisible:false,backButtonStyle:'arrowText',titleFontSize:17,buttonFontSize:16}); 'started';")
         let source = try waitForPage(after: root)
         XCTAssertEqual(navigation.navigationBar.tintColor, UIColor(red: 4/255, green: 159/255, blue: 145/255, alpha: 1))
+        // 打开的首帧、后创建的操作按钮与局部更新使用同一背景设置。
+        XCTAssertEqual(theme(source, ["actionTxt": "添加"]), 0)
+        XCTAssertEqual(theme(source, ["title": "导航栏样式"]), 0)
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            XCTAssertEqual(root.navigationItem.rightBarButtonItem?.hidesSharedBackground, false)
+            XCTAssertEqual(source.navigationItem.leftBarButtonItem?.hidesSharedBackground, true)
+            XCTAssertEqual(source.navigationItem.rightBarButtonItem?.hidesSharedBackground, true)
+        }
+        #endif
         capture("navigation-appearance-initial")
+        XCTAssertEqual(theme(source, ["buttonBackgroundVisible": true]), 0)
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            XCTAssertEqual(source.navigationItem.leftBarButtonItem?.hidesSharedBackground, false)
+            XCTAssertEqual(source.navigationItem.rightBarButtonItem?.hidesSharedBackground, false)
+        }
+        #endif
         script(source, """
             const set=(name,value)=>{const el=document.querySelector(`[name="${name}"]`);el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));};
             const hidden=document.querySelector('[name="hidden"]');hidden.checked=false;hidden.dispatchEvent(new Event('change',{bubbles:true}));
+            const background=document.querySelector('[name="buttonBackgroundVisible"]');
+            background.checked=false;background.dispatchEvent(new Event('change',{bubbles:true}));
             set('buttonColor','#0066cc');set('titleFontSize','32');set('buttonFontSize','28');set('backButtonText','返回');
             setTimeout(()=>document.querySelector('.theme-replace-page').click(),0); 'started';
             """)
@@ -48,6 +67,11 @@ final class NavigationTests: XCTestCase {
         let font = try XCTUnwrap(navigation.navigationBar.standardAppearance.titleTextAttributes[.font] as? UIFont)
         XCTAssertLessThanOrEqual(font.pointSize, 32)
         capture("navigation-appearance-replacement-large-type")
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            XCTAssertEqual(target.navigationItem.leftBarButtonItem?.hidesSharedBackground, true)
+        }
+        #endif
         let back = try XCTUnwrap(target.navigationItem.leftBarButtonItem?.customView as? UIButton)
         XCTAssertGreaterThanOrEqual(back.bounds.width, 44)
         back.sendActions(for: .touchUpInside)
@@ -189,6 +213,7 @@ final class NavigationTests: XCTestCase {
         defer { window.isHidden = true }
         page.title = "原页"
         XCTAssertEqual(theme(page, ["title": "不应应用", "buttonColor": "bad"]), -1001)
+        XCTAssertEqual(theme(page, ["title": "不应应用", "buttonBackgroundVisible": "false"]), -1001)
         XCTAssertEqual(page.title, "原页")
         for method in ["navigateTo", "redirectTo"] {
             let replied = expectation(description: method)

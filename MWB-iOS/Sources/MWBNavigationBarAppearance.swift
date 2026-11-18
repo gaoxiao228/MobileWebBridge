@@ -24,12 +24,14 @@ public struct MWBNavigationBarAppearance {
     public let titleFontSize: CGFloat?
     public let titleFontWeight: MWBTitleFontWeight?
     public let buttonFontSize: CGFloat?
+    /// iOS 26 起控制导航按钮的系统玻璃背景；nil 保留系统样式。
+    public let buttonBackgroundVisible: Bool?
 
     public init(color: UIColor? = nil, titleColor: UIColor? = nil, buttonColor: UIColor? = nil,
                 backButtonStyle: MWBBackButtonStyle? = nil, backButtonText: String? = nil,
                 separatorVisible: Bool? = nil, separatorColor: UIColor? = nil,
                 titleFontSize: CGFloat? = nil, titleFontWeight: MWBTitleFontWeight? = nil,
-                buttonFontSize: CGFloat? = nil) {
+                buttonFontSize: CGFloat? = nil, buttonBackgroundVisible: Bool? = nil) {
         precondition(titleFontSize.map { $0.isFinite && $0 > 0 && $0 <= 32 } ?? true)
         precondition(buttonFontSize.map { $0.isFinite && $0 > 0 && $0 <= 28 } ?? true)
         precondition(backButtonText.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? true)
@@ -37,12 +39,16 @@ public struct MWBNavigationBarAppearance {
         self.backButtonStyle = backButtonStyle; self.backButtonText = backButtonText
         self.separatorVisible = separatorVisible; self.separatorColor = separatorColor
         self.titleFontSize = titleFontSize; self.titleFontWeight = titleFontWeight; self.buttonFontSize = buttonFontSize
+        self.buttonBackgroundVisible = buttonBackgroundVisible
     }
 
-    var isEmpty: Bool {
-        color == nil && titleColor == nil && buttonColor == nil && backButtonStyle == nil && backButtonText == nil
-            && separatorVisible == nil && separatorColor == nil && titleFontSize == nil
-            && titleFontWeight == nil && buttonFontSize == nil
+    var isEmpty: Bool { !hasSharedBarStyle && buttonBackgroundVisible == nil }
+
+    // 按钮底由每个按钮绘制，不属于共享导航栏的外观快照。
+    var hasSharedBarStyle: Bool {
+        color != nil || titleColor != nil || buttonColor != nil || backButtonStyle != nil || backButtonText != nil
+            || separatorVisible != nil || separatorColor != nil || titleFontSize != nil
+            || titleFontWeight != nil || buttonFontSize != nil
     }
 
     /// 缺省字段保留前值，显式按钮色保持独立；未设置时在渲染层回退到标题色。
@@ -51,7 +57,8 @@ public struct MWBNavigationBarAppearance {
               buttonColor: next.buttonColor ?? buttonColor, backButtonStyle: next.backButtonStyle ?? backButtonStyle,
               backButtonText: next.backButtonText ?? backButtonText, separatorVisible: next.separatorVisible ?? separatorVisible,
               separatorColor: next.separatorColor ?? separatorColor, titleFontSize: next.titleFontSize ?? titleFontSize,
-              titleFontWeight: next.titleFontWeight ?? titleFontWeight, buttonFontSize: next.buttonFontSize ?? buttonFontSize)
+              titleFontWeight: next.titleFontWeight ?? titleFontWeight, buttonFontSize: next.buttonFontSize ?? buttonFontSize,
+              buttonBackgroundVisible: next.buttonBackgroundVisible ?? buttonBackgroundVisible)
     }
 
     func buttonFont(traits: UITraitCollection) -> UIFont? {
@@ -63,7 +70,8 @@ public struct MWBNavigationBarAppearance {
 /// 先完整解析再应用，错误输入不能部分修改页面或创建目标容器。
 struct MWBNavigationBarPatch {
     static let keys: Set<String> = ["color", "titleColor", "buttonColor", "backButtonStyle", "backButtonText",
-        "showBackButton", "separatorVisible", "separatorColor", "titleFontSize", "titleFontWeight", "buttonFontSize"]
+        "showBackButton", "separatorVisible", "separatorColor", "titleFontSize", "titleFontWeight", "buttonFontSize",
+        "buttonBackgroundVisible"]
     static let newKeys = keys.subtracting(["color", "titleColor"])
     let appearance: MWBNavigationBarAppearance
     let showBackButton: Bool?
@@ -108,7 +116,8 @@ struct MWBNavigationBarPatch {
             buttonColor: color("buttonColor"), backButtonStyle: style, backButtonText: text,
             separatorVisible: boolean("separatorVisible"), separatorColor: color("separatorColor"),
             titleFontSize: size("titleFontSize", max: 32), titleFontWeight: weight,
-            buttonFontSize: size("buttonFontSize", max: 28)), showBackButton: boolean("showBackButton"),
+            buttonFontSize: size("buttonFontSize", max: 28), buttonBackgroundVisible: boolean("buttonBackgroundVisible")),
+            showBackButton: boolean("showBackButton"),
             enablesIsolation: !Set(params.keys).intersection(strict ? keys : newKeys).isEmpty)
     }
 }

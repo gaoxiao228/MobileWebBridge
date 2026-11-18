@@ -40,7 +40,7 @@ void replacement;
 
 // 编译约束：三个入口共享同一组外观字段，旧调用仍可省略。
 const appearance = { color: "f6fbfa", titleColor: "0b4148", buttonColor: "049f91", backButtonStyle: "arrowText",
-  backButtonText: "返回", showBackButton: true, separatorVisible: true, separatorColor: "dfe8e5",
+  backButtonText: "返回", showBackButton: true, buttonBackgroundVisible: false, separatorVisible: true, separatorColor: "dfe8e5",
   titleFontSize: 17, titleFontWeight: "semibold", buttonFontSize: 16 } satisfies NavigationBarAppearanceOptions;
 const styledPush = { url: "https://example.com/a", ...appearance } satisfies ParamNavigateTo;
 const styledReplace = { url: "https://example.com/b", ...appearance } satisfies ParamRedirectTo;

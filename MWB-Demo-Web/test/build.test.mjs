@@ -456,6 +456,13 @@ test('导航栏配置页将表单值应用到当前原生容器', async () => {
     dom.window.eval(readFileSync(join(project, 'dist', 'demo.js'), 'utf8'));
     assert.match(dom.window.document.querySelector('#app')?.textContent ?? '', /导航栏样式/);
     assert.ok(dom.window.document.querySelector('[name="showBackButton"]'));
+    // 等待 Vue 根据原生平台渲染 iOS 专属选项。
+    await new Promise(resolve => setImmediate(resolve));
+    const background = dom.window.document.querySelector('[name="buttonBackgroundVisible"]');
+    assert.ok(background, 'iOS Demo 应允许隐藏按钮底');
+    assert.equal(background.checked, true);
+    background.checked = false;
+    background.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
     const title = dom.window.document.querySelector('[name="title"]');
     title.value = '预览标题';
     title.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
@@ -465,6 +472,7 @@ test('导航栏配置页将表单值应用到当前原生容器', async () => {
     assert.equal(dom.window.document.querySelector('[name="hidden"]').checked, true);
     assert.equal(applied?.hidden, true);
     assert.equal(applied?.title, '预览标题');
+    assert.equal(applied?.buttonBackgroundVisible, false);
     assert.equal(applied?.color, '12374a');
   } finally {
     dom.window.close();
@@ -488,6 +496,13 @@ test('导航栏打开和替换入口直接携带外观，目标无需补设主�
       for (const name of ['buttonColor', 'backButtonStyle', 'backButtonText', 'separatorVisible', 'separatorColor', 'titleFontSize', 'titleFontWeight', 'buttonFontSize']) {
         assert.ok(dom.window.document.querySelector(`[name="${name}"]`), `${name} 应有配置入口`);
       }
+      // Android 用原有样式，打开和替换均不能收到 iOS 专属字段。
+      const background = dom.window.document.querySelector('[name="buttonBackgroundVisible"]');
+      assert.equal(Boolean(background), osType === 2);
+      if (background) {
+        background.checked = false;
+        background.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+      }
       for (const selector of ['.theme-open-page', '.theme-replace-page']) {
         dom.window.document.querySelector(selector).click();
         await new Promise(resolve => setImmediate(resolve));
@@ -502,6 +517,8 @@ test('导航栏打开和替换入口直接携带外观，目标无需补设主�
         assert.equal('onActionClick' in params, false);
         assert.equal('isBright' in params, false);
         assert.equal('waitForReady' in params, osType === 2);
+        if (osType === 2) assert.equal(params.buttonBackgroundVisible, false);
+        else assert.equal('buttonBackgroundVisible' in params, false);
       }
     } finally { dom.window.close(); }
   }
@@ -566,6 +583,7 @@ test('Android 配置页显示专有选项且无效颜色不会调用原生', asy
     assert.equal(applied[0]?.color, '445566');
     assert.equal(applied[0]?.showBackButton, true);
     assert.equal(applied[0]?.isBright, false);
+    assert.equal('buttonBackgroundVisible' in applied[0], false);
   } finally {
     dom.window.close();
   }

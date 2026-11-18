@@ -9,6 +9,7 @@ const title = ref('导航栏样式');
 const color = ref('#12374a');
 const titleColor = ref('#ffffff');
 const buttonColor = ref('#049f91');
+const buttonBackgroundVisible = ref(true);
 const backButtonStyle = ref('arrowText');
 const backButtonText = ref('返回');
 const separatorVisible = ref(true);
@@ -40,7 +41,9 @@ const appearance = computed(() => ({
   backButtonStyle: backButtonStyle.value, backButtonText: backButtonText.value,
   showBackButton: showBackButton.value, separatorVisible: separatorVisible.value,
   separatorColor: hex(separatorColor.value), titleFontSize: Number(titleFontSize.value),
-  titleFontWeight: titleFontWeight.value, buttonFontSize: Number(buttonFontSize.value)
+  titleFontWeight: titleFontWeight.value, buttonFontSize: Number(buttonFontSize.value),
+  // iOS 26 起可单独隐藏系统按钮底；Android 不发送此参数。
+  ...(platform.value === 'ios' ? { buttonBackgroundVisible: buttonBackgroundVisible.value } : {})
 }));
 const theme = computed(() => {
   const params = {
@@ -173,6 +176,7 @@ async function openNewContainer(replace = false) {
 
       <label class="theme-field" for="theme-button-color"><span>按钮颜色（返回、关闭、右侧操作）</span><input id="theme-button-color" name="buttonColor" v-model="buttonColor" type="text" spellcheck="false" placeholder="#049f91"></label>
       <button type="button" class="back-button" @click="buttonColor = titleColor">复制标题颜色到按钮</button>
+      <label v-if="platform === 'ios'" class="theme-switch"><span><strong>显示按钮背景</strong><small>iOS 26 起生效。深色栏去底后，可试试浅色按钮，如 #74E1D5。</small></span><input name="buttonBackgroundVisible" v-model="buttonBackgroundVisible" type="checkbox"></label>
       <div class="theme-color-grid">
         <label class="theme-field" for="theme-back-style"><span>返回样式</span><select id="theme-back-style" name="backButtonStyle" v-model="backButtonStyle"><option value="text">文字</option><option value="arrow">箭头</option><option value="arrowText">箭头加文字</option></select></label>
         <label class="theme-field" for="theme-back-text"><span>返回文字</span><input id="theme-back-text" name="backButtonText" v-model="backButtonText" required maxlength="20"></label>
