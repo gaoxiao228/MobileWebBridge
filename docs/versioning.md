@@ -1,14 +1,14 @@
 # 版本、支持范围与升级
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。本轮目标版本为 `0.1.6`，各端制品状态待核验，支持从源码接入。`0.1.5` 于 2026-11-09 通过 npm、Maven 公共仓库独立消费及 iOS Git Pod Release 接入验证。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本为 `0.1.6`。npm 已公开并通过独立安装验证；iOS 已通过该 Git Tag 的独立 Pod Release 接入验证。Android `0.1.6` 尚未在 Maven Central 公开，可从源码或本地 Maven 接入。`0.1.5` 于 2026-11-09 通过 npm、Maven 公共仓库独立消费及 iOS Git Pod Release 接入验证。
 
 ## 当前状态
 
 | 组件 | 当前版本 | 获取方式与状态 |
 | --- | --- | --- |
-| JS SDK | `0.1.6` | 目标 npm 版本，公共制品待核验 |
-| iOS | `0.1.6` | 共享源码 Tag / 本地 Pod；不发布公共 CocoaPods Specs |
-| Android | `0.1.6` | 目标 Maven Central 版本，公共制品待核验；支持源码与本地 Maven |
+| JS SDK | `0.1.6` | npm 已公开，`latest` 为 `0.1.6`；独立安装验证通过 |
+| iOS | `0.1.6` | 共享 Git Tag 的独立 Pod Release 接入验证通过；也可用本地 Pod，不发布公共 CocoaPods Specs |
+| Android | `0.1.6` | Maven Central 待发布；源码与本地 Maven 接入验证通过 |
 | Demo Web | `0.1.6` | 与本轮 SDK 配套，构建号 6 |
 
 `0.1.6` 新增三个导航方法共用的外观配置与宿主默认主题。打开和替换时，配置在目标页首帧前生效；iOS 26 及以上可隐藏返回按钮和右侧操作的系统背景。详见[原生导航栏外观](navigation-bar.md)。
@@ -40,7 +40,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | 共享 Git Tag | iOS Pod 版本 | Android Maven 版本 | JS npm 版本 | 状态 |
 | --- | --- | --- | --- | --- |
-| `0.1.6` | `0.1.6` | `0.1.6` | `0.1.6` | 目标版本，制品状态待核验 |
+| `0.1.6` | `0.1.6` | `0.1.6` | `0.1.6` | GitHub Tag 与 npm 已公开，iOS Git Pod Release 接入验证通过；Maven Central 待发布 |
 | `0.1.5` | `0.1.5` | `0.1.5` | `0.1.5` | GitHub Tag、npm 与 Maven Central 已公开；iOS Git Pod Release 接入验证通过 |
 | `0.1.4` | `0.1.4` | `0.1.4` | `0.1.4` | GitHub Tag、npm 与 Maven Central 已公开；iOS Tag 源码的独立 Pod 接入验证通过 |
 | `0.1.3` | `0.1.3` | `0.1.3` | `0.1.3` | GitHub Tag、npm 与 Maven Central 已公开；iOS Git Pod 验证通过 |
