@@ -1,5 +1,5 @@
 PODS:
-  - MobileWebBridge (0.1.5)
+  - MobileWebBridge (0.1.6)
 
 DEPENDENCIES:
   - MobileWebBridge (from `..`)
@@ -9,7 +9,7 @@ EXTERNAL SOURCES:
     :path: ".."
 
 SPEC CHECKSUMS:
-  MobileWebBridge: f8c7cb413d556979c0a1b844dc156f30bd506d24
+  MobileWebBridge: 5030910668ac36061763134c155050ca9964ffc1
 
 PODFILE CHECKSUM: 8cc3d7b8f6646509dfdc9546f39d9d0efaf127ef
 

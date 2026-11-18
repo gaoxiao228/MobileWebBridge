@@ -2,22 +2,22 @@
 
 Kotlin 编写的 Android Web 容器，最低 API 24。`mwb` 是可供宿主依赖的 Android library，`sample` 是本地网页示例。底层固定使用 [DSBridge Android 3.0.0](https://github.com/wendux/DSBridge-Android/tree/3.0.0) 的三个 Java 源文件（提交 `d3e5ebc6ca8170f97e420f2f482680c8e149b471`）；做了 AndroidX、Android 35 兼容、安全设置及主线程导航分发优化。
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。Android 版本为 `0.1.5`，对应 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.5`，配合 JS/iOS `0.1.5` 和插件协议 1 使用。分发状态见 [版本说明](../docs/versioning.md)；也支持源码 library 模块和本地 Maven 接入。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。Android 版本为 `0.1.6`，对应 Maven 坐标 `io.github.gaoxiao228:mobile-web-bridge:0.1.6`，配合 JS/iOS `0.1.6` 和插件协议 1 使用。分发状态见 [版本说明](../docs/versioning.md)；也支持源码 library 模块和本地 Maven 接入。
 
 构建将完整许可放入 AAR 的 classes.jar（META-INF/mobile-web-bridge/）；Sample assets 同时带网页/Vue/DSBridge声明，详见 THIRD_PARTY_NOTICES.md。
 
 ## 接入
 
-当前源码和默认构建版本为 `0.1.5`；错误页能力请使用配套原生 SDK，不能仅升级 H5。
+当前源码和默认构建版本为 `0.1.6`；错误页能力请使用配套原生 SDK，不能仅升级 H5。
 
-当前源码支持默认本地 HTML 错误页、自定义 assets 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.5` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
+当前源码支持默认本地 HTML 错误页、自定义 assets 模板、容器 `onGoHome` 回调和宿主 `configureContainer` 初始化钩子。该能力随 `0.1.6` 源码提供；用法见 [错误页与自定义模板](../docs/error-pages.md)。
 
 将 `mwb` 模块作为 Gradle library 引入宿主项目。使用 JDK 17、Android SDK 35 和 Gradle Wrapper 构建。宿主在 `Application.onCreate` 安装应用专属能力：
 
 ```kotlin
 MWB.install(object : MWBHost {
     override fun appInfo() = JSONObject().put("appId", packageName)
-        .put("appVersionName", "0.1.5").put("appVersionCode", 5).put("environment", 2)
+        .put("appVersionName", "0.1.6").put("appVersionCode", 6).put("environment", 2)
     override fun nativePage(name: String, extInfo: JSONObject?): Intent? =
         if (name == "profile") Intent(this@MyApplication, ProfileActivity::class.java) else null
 })
@@ -42,7 +42,7 @@ MWB WebView 默认禁用页面双指缩放和系统长按选项；普通点击�
 宿主收到推送后可调用当前容器的 `sendEvent("remoteNotificationReceive", payload)`。Kotlin 调用 H5 句柄使用 `callJsHandler("handlerName", arrayOf(arg)) { result -> ... }`。`exitApp()` 默认仅关闭当前 MWB Activity，若宿主实现 `closeContainer()` 则由宿主自行处理。
 
 `setNavigationBarTheme` 支持右上角文字按钮 `actionTxt`；网页传入 `onActionClick` 可接收点击事件和 `actionExt`。未显式配置 buttonColor 时，按钮文字跟随标题颜色，传入空 `actionTxt` 可移除按钮。图片按钮 `actionIcon` 暂不支持。
-Android 标题按整栏居中；旧调用默认箭头返回且标题/按钮同色。当前未发布源码新增独立按钮色和可配置返回展示，见[原生导航栏外观](../docs/navigation-bar.md)。
+Android 标题按整栏居中；旧调用默认箭头返回且标题/按钮同色。`0.1.6` 新增独立按钮色和可配置返回展示，见[原生导航栏外观](../docs/navigation-bar.md)。
 
 扫码使用 Google Code Scanner，需要设备具备 Google Play 服务；无此服务时返回 `-1004`。此组件不提供相册扫码，显式传入 `hideAlbum: false` 返回 `-1004`。相机、旧版 Android 相册写入权限由库请求，用户拒绝返回 `-1008`。图片路径是 MWB 私有缓存目录中的文件，`convertImagePathToBase64` 和 `openFile` 不读取任意外部路径。`chooseImage` 的相机分支返回系统相机的缩略图；需要全分辨率照片时可在宿主扩展。
 
@@ -54,13 +54,13 @@ Android 标题按整栏居中；旧调用默认箭头返回且标题/按钮同�
 
 ## Maven 制品与独立接入
 
-Android 与 iOS、JS、Demo 共用一个仓库发布 Tag（本轮为 `0.1.5`），不单独创建 Android 平台 Tag。Git Tag 固定源码提交，Maven 版本由本次发布的版本表确定，详见 [共享 Tag 约定](../docs/versioning.md#多端共享-git-tag)。
+Android 与 iOS、JS、Demo 共用一个仓库发布 Tag（本轮为 `0.1.6`），不单独创建 Android 平台 Tag。Git Tag 固定源码提交，Maven 版本由本次发布的版本表确定，详见 [共享 Tag 约定](../docs/versioning.md#多端共享-git-tag)。
 
-本轮坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.5`。在消费工程配置 `google()`、`mavenCentral()` 并添加该坐标；需要本地构建时使用以下文件仓库流程。
+本轮坐标为 `io.github.gaoxiao228:mobile-web-bridge:0.1.6`。在消费工程配置 `google()`、`mavenCentral()` 并添加该坐标；需要本地构建时使用以下文件仓库流程。
 
 ```bash
 # 当前目录：显式指定本地构建版本，仅写入 build/maven-repository。
-./gradlew :mwb:publishReleasePublicationToLocalIntegrationRepository -PmwbVersion=0.1.5
+./gradlew :mwb:publishReleasePublicationToLocalIntegrationRepository -PmwbVersion=0.1.6
 ```
 
 生成 release AAR、sources、Dokka API 文档 JAR、POM 和 Gradle 元数据；POM 包含 Kotlin、AppCompat 和扫码的传递依赖。接入方在 settings 的 dependencyResolutionManagement 中配置文件仓库，再按坐标依赖：
@@ -73,7 +73,7 @@ repositories {
     mavenCentral()
 }
 // app/build.gradle.kts
-dependencies { implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.5") }
+dependencies { implementation("io.github.gaoxiao228:mobile-web-bridge:0.1.6") }
 ```
 
 在源码根目录执行 `python3 scripts/check-android-consumer.py`，自动检查 AAR/许可/sources/POM，并让独立工程仅通过坐标和 POM 编译公开 API，避免 project 依赖掩盖分发问题。脚本可加 `--offline`，此时需要依赖已缓存；它不安装或运行设备。
@@ -144,7 +144,7 @@ Sample release 开启消费端 R8，可检查 `sample/build/outputs/mapping/rele
 
 ## 加载状态与首屏就绪
 
-当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 Android、iOS 和 JS `0.1.5`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
+当前源码新增容器级 `onLoadStateChange`、`onPageReady` 和只读 `isPageReady`。此能力请配套使用 Android、iOS 和 JS `0.1.6`。WebView 完成不代表 H5 首屏准备完成，H5 应在合适时机调用 `mwb.basic.notifyPageReady()`。
 
 Android 在子类的 `super.onCreate` 前安装回调，并让宿主 Manifest/Intent 指向该子类；失败原因通过 `loadError` 读取。
 
@@ -152,4 +152,4 @@ Android 在子类的 `super.onCreate` 前安装回调，并让宿主 Manifest/In
 
 双端代码示例、就绪去重、重载与兼容性见 [容器加载状态与首屏就绪](../docs/page-lifecycle.md)。
 
-当前未发布源码支持三个导航方法共用外观参数和 MWBConfiguration.navigationBarAppearance 宿主默认主题，目标首帧前应用；已发布 0.1.5 不包含这些扩展。字段、合并、兼容和原生配置示例见[原生导航栏外观](../docs/navigation-bar.md)。
+`0.1.6` 支持三个导航方法共用外观字段，宿主可设置 `navigationBarAppearance` 默认主题；打开或替换页面时，目标页首帧前即应用外观。按钮背景开关仅 iOS 26 及以上支持，Android 请省略。详见[原生导航栏外观](../docs/navigation-bar.md)。

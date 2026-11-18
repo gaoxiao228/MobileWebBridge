@@ -33,7 +33,7 @@ mwb.basic.redirectTo({
 | `hidden` | `boolean` | `true` | 是否隐藏新容器导航栏 |
 | `waitForReady` | `boolean` | iOS 为 `false` | 仅 iOS 支持；Android 必须省略，包括 `false` 也不能传 |
 
-已发布 0.1.5 中其他字段（包括 `isPopUp`）返回 `-1004`。当前未发布源码另支持[首帧外观参数](navigation-bar.md)，isPopUp 仍不适用于替换。参数使用明确类型，不将数字、字符串或 `null` 自动转换为布尔值。
+从 `0.1.6` 起，`redirectTo` 支持[首帧外观参数](navigation-bar.md)。`0.1.5` 不支持这些扩展。`isPopUp` 仍不适用于替换，传入会返回 `-1004`。参数使用明确类型，不将数字、字符串或 `null` 自动转换为布尔值。
 
 ## 页面与返回行为
 

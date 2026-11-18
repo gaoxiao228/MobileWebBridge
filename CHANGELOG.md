@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.1.6 — 2026-11-18
+
+- `setNavigationBarTheme`、`navigateTo` 和 `redirectTo` 共用外观配置。新增标题与按钮独立配色、返回展示、分隔线和字体配置；宿主可设置默认主题，打开和替换时在目标页首帧前应用。
+- iOS 26 及以上可用 `buttonBackgroundVisible: false` 隐藏返回和右侧操作的系统按钮背景。默认保留系统样式，旧 iOS 忽略该字段，Android 请省略。
+- 两端 Demo 演示导航栏外观及替换当前页面；替换示例默认指向主 H5 页面。Android 仍不支持 `waitForReady`。
+- JS、iOS、Android 与 Demo 统一为 `0.1.6`，Demo 构建号 6。各端制品状态见[版本说明](docs/versioning.md)。
+
 ## 0.1.5 — 2026-11-09
 
 - JS、iOS、Android 新增 `redirectTo`：将 `P → A` 替换为 `P → B`，新容器默认隐藏导航栏，支持替换根页面；原 `navigateTo` 保留新增页面行为。

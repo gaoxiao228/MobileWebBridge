@@ -79,8 +79,8 @@ private final class ExampleHost: MWBHostDelegate {
     func appInfo() -> [String: Any]? {
         [
             "appId": "mwb-ios-example",
-            "appVersionName": "0.1.5",
-            "appVersionCode": 5,
+            "appVersionName": "0.1.6",
+            "appVersionCode": 6,
             "environment": 0
         ]
     }
