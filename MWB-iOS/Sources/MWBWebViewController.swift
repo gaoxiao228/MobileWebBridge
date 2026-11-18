@@ -68,6 +68,10 @@ open class MWBWebViewController: UIViewController {
 
     private func invalidatePluginDocument() {
         documentRevision += 1
+        // 操作归文档所有；整页换文档不能复用上一文档的按钮和载荷。
+        navigationItem.rightBarButtonItem = nil
+        navigationActionExt = nil
+        navigationActionRevision = nil
         pendingNavigation?.cancel(deliverReply: false)
         navigationPreparation?.documentChanged()
         hasRequestedPrewarming = false
@@ -128,29 +132,27 @@ open class MWBWebViewController: UIViewController {
     private var hasStartedNavigation = false
     var initialPageOverride: URL?
     var initialNavigationBarHidden: Bool?
-    private var navigationBarState: NavigationBarState?
+    private var navigationBarState: MWBNavigationBarSnapshot?
+    private var navigationStyle: MWBNavigationBarAppearance
+    private var initialNavigationPatch: MWBNavigationBarPatch?
+    private var navigationShowBackButton: Bool?
+    private var navigationThemeHidden: Bool?
+    private var usesIsolatedAppearance = false
     private var navigationActionExt: String?
+    var currentNavigationActionExt: String? { navigationActionExt }
+    private var navigationActionRevision: Int?
     private weak var managedPopGesture: UIGestureRecognizer?
     private weak var previousPopGestureDelegate: UIGestureRecognizerDelegate?
     private var previousPopGestureEnabled = true
 
-
-    // UINavigationController 的导航栏由多个页面共用；每页保存自己的可见样式。
-    private struct NavigationBarState {
-        let hidden: Bool
-        let backgroundColor: UIColor?
-        let titleTextAttributes: [NSAttributedString.Key: Any]?
-        let tintColor: UIColor?
-        let standardAppearance: UINavigationBarAppearance
-        let scrollEdgeAppearance: UINavigationBarAppearance?
-        let compactAppearance: UINavigationBarAppearance?
-    }
 
     /// 公开指定初始化器，允许外部子类继承或调用 super.init(configuration:)。
     public init(configuration: MWBConfiguration) {
         let pluginSnapshot = MWB.pluginSnapshot()
         self.pluginSnapshot = pluginSnapshot
         self.configuration = configuration
+        self.navigationStyle = configuration.navigationBarAppearance ?? .init()
+        self.usesIsolatedAppearance = !self.navigationStyle.isEmpty
         self.navigationPolicy = MWBNavigationPolicy(
             allowedOrigins: configuration.allowedOrigins,
             localRoot: Bundle.main.resourceURL
@@ -194,6 +196,8 @@ open class MWBWebViewController: UIViewController {
 
     public override func viewDidLoad() {
         super.viewDidLoad()
+        // 即使先沿用旧行为，也要在任何主题写入前只读保存宿主基线。
+        _ = navigationController?.mwbNavigationState
         // 仅 ready 实例可同步移交；未命中直接冷启动，不阻塞导航转场。
         let webView = (configuration.webViewPrewarmingEnabled ? MWBWebViewPrewarmer.shared.takeReady() : nil)
             ?? MWBInteractionWebView.make()
@@ -241,6 +245,10 @@ open class MWBWebViewController: UIViewController {
         errorPresenter = MWBErrorPagePresenter(parent: view, configuration: configuration.errorPage,
             onRetry: { [weak self] in self?.retryFailedPage() }, onGoHome: { [weak self] in self?.goHomeFromError() })
         host?.configureContainer(self)
+        if let patch = initialNavigationPatch {
+            initialNavigationPatch = nil
+            applyNavigationBarPatch(patch)
+        }
         // configureContainer 可重入取消任务；取消后不能再启动初始加载。
         guard !abandonedNavigationPreparation else { return }
         load(initialPageOverride ?? configuration.initialURL)
@@ -336,66 +344,121 @@ open class MWBWebViewController: UIViewController {
 
     public override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        if let navigationBarState {
-            restoreNavigationBarState(navigationBarState)
-        } else {
-            // 新容器首次出现时采用 navigateTo 传入的导航栏状态，再保存本页快照。
-            if let initialNavigationBarHidden {
-                navigationController?.setNavigationBarHidden(initialNavigationBarHidden, animated: false)
-            }
-            rememberNavigationBarState()
+        prepareNavigationBarState()
+        if let navigation = navigationController {
+            // 只有真实入栈的目标才启用隔离；离屏准备、取消和失败都不修改宿主标志。
+            if usesIsolatedAppearance, navigation.topViewController === self { navigation.mwbNavigationState.isolated = true }
+            navigationBarState?.restore(navigation)
         }
-        if navigationController?.viewControllers.count ?? 0 > 1 {
-            navigationItem.leftBarButtonItem = UIBarButtonItem(
-                title: "返回", style: .plain, target: self, action: #selector(handleBackButton)
-            )
+        configureBackButton()
+    }
+
+    /// 打开补丁在宿主初始化后、加载目标文档前应用；不会写来源页的共享栏。
+    func configureInitialNavigationBar(_ patch: MWBNavigationBarPatch) { initialNavigationPatch = patch }
+
+    private func prepareNavigationBarState() {
+        guard let navigation = navigationController else { return }
+        if navigationBarState == nil {
+            let host = navigation.mwbNavigationState
+            navigationBarState = (usesIsolatedAppearance || host.isolated) ? host.baseline : .init(navigation)
+            navigationBarState?.hidden = navigationThemeHidden ?? initialNavigationBarHidden ?? navigation.isNavigationBarHidden
+        }
+        navigationBarState?.apply(navigationStyle, traits: traitCollection)
+    }
+
+    func applyNavigationBarPatch(_ patch: MWBNavigationBarPatch, hidden: Bool? = nil) {
+        // 先合并自己的值，再决定是否允许接触共享 UINavigationBar。
+        navigationStyle = navigationStyle.merging(patch.appearance)
+        usesIsolatedAppearance = usesIsolatedAppearance || patch.enablesIsolation
+        if let show = patch.showBackButton { navigationShowBackButton = show }
+        if let hidden { navigationThemeHidden = hidden; navigationBarState?.hidden = hidden }
+        prepareNavigationBarState()
+        if let navigation = navigationController, navigation.topViewController === self {
+            if usesIsolatedAppearance { navigation.mwbNavigationState.isolated = true }
+            navigationBarState?.restore(navigation)
+        }
+        configureBackButton()
+        if let button = navigationItem.rightBarButtonItem { styleActionButton(button) }
+    }
+
+    private func configureBackButton() {
+        // 隐藏 UIKit 自动生成的返回项；是否展示由本容器自有控件决定。
+        navigationItem.hidesBackButton = true
+        guard let navigation = navigationController, navigation.viewControllers.count > 1,
+              navigationShowBackButton != false else {
+            navigationItem.leftBarButtonItem = nil
+            return
+        }
+        let text = navigationStyle.backButtonText ?? "返回"
+        let style = navigationStyle.backButtonStyle ?? .text
+        let item: UIBarButtonItem
+        if style == .arrowText {
+            let button = UIButton(type: .system)
+            button.setTitle(text, for: .normal)
+            button.setImage(UIImage(systemName: "chevron.backward"), for: .normal)
+            button.titleLabel?.font = navigationStyle.buttonFont(traits: traitCollection) ?? .systemFont(ofSize: 17)
+            button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
+            button.addTarget(self, action: #selector(handleBackButton), for: .touchUpInside)
+            button.accessibilityLabel = text
+            button.sizeToFit()
+            button.frame.size = CGSize(width: max(44, button.frame.width), height: max(44, button.frame.height))
+            item = UIBarButtonItem(customView: button)
+        } else if style == .arrow {
+            item = UIBarButtonItem(image: UIImage(systemName: "chevron.backward"), style: .plain,
+                                   target: self, action: #selector(handleBackButton))
+            item.accessibilityLabel = text
+        } else {
+            item = UIBarButtonItem(title: text, style: .plain, target: self, action: #selector(handleBackButton))
+        }
+        styleActionButton(item)
+        navigationItem.leftBarButtonItem = item
+    }
+
+    private func styleActionButton(_ item: UIBarButtonItem) {
+        item.tintColor = navigationStyle.buttonColor ?? navigationStyle.titleColor ?? navigationBarState?.tintColor
+        item.customView?.tintColor = item.tintColor
+        if let font = navigationStyle.buttonFont(traits: traitCollection) {
+            item.setTitleTextAttributes([.font: font], for: .normal)
+            item.setTitleTextAttributes([.font: font], for: .highlighted)
+        }
+    }
+
+    public override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+            // 字号变化仍只更新当前页，返回时其他容器会按自己的 traits 重算。
+            if let patch = try? MWBNavigationBarPatch.parse([:]) { applyNavigationBarPatch(patch) }
         }
     }
 
     /// 主题方法修改当前页后更新快照，供子页返回时恢复当前页样式。
     func rememberNavigationBarState() {
         guard let navigationController else { return }
-        let bar = navigationController.navigationBar
-        navigationBarState = NavigationBarState(
-            hidden: navigationController.isNavigationBarHidden,
-            backgroundColor: bar.backgroundColor,
-            titleTextAttributes: bar.titleTextAttributes,
-            tintColor: bar.tintColor,
-            standardAppearance: bar.standardAppearance.copy(),
-            scrollEdgeAppearance: bar.scrollEdgeAppearance?.copy(),
-            compactAppearance: bar.compactAppearance?.copy()
-        )
-    }
-
-    private func restoreNavigationBarState(_ state: NavigationBarState) {
-        guard let navigationController else { return }
-        let bar = navigationController.navigationBar
-        bar.backgroundColor = state.backgroundColor
-        bar.titleTextAttributes = state.titleTextAttributes
-        bar.tintColor = state.tintColor
-        bar.standardAppearance = state.standardAppearance
-        bar.scrollEdgeAppearance = state.scrollEdgeAppearance
-        bar.compactAppearance = state.compactAppearance
-        navigationController.setNavigationBarHidden(state.hidden, animated: false)
+        _ = navigationController.mwbNavigationState
+        navigationBarState = .init(navigationController)
     }
 
     /// 右上角文字按钮归当前页面所有，点击时只通知当前可信网页。
     func configureNavigationAction(title: String?, ext: String?) {
         navigationActionExt = ext
+        navigationActionRevision = documentRevision
         if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             navigationItem.rightBarButtonItem = UIBarButtonItem(
                 title: title, style: .plain, target: self, action: #selector(handleNavigationAction)
             )
+            if let item = navigationItem.rightBarButtonItem { styleActionButton(item) }
         } else {
             navigationItem.rightBarButtonItem = nil
         }
     }
 
     @objc private func handleNavigationAction() {
-        guard let url = webView?.url, isTrusted(url) else { return }
+        guard navigationActionRevision == documentRevision, isContainerVisible,
+              navigationController?.topViewController === self,
+              let url = webView?.url, isTrusted(url), let document = pluginSession.identity else { return }
         var payload: [String: Any] = [:]
         if let navigationActionExt { payload["actionExt"] = navigationActionExt }
-        callJSHandler("navigationActionClick", arguments: [payload])
+        webView?.evaluateJavaScript(MWBPluginJavaScript.navigationAction(document: document, payload: payload), completionHandler: nil)
     }
 
     public override func viewDidAppear(_ animated: Bool) {

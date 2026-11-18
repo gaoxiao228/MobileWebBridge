@@ -12,6 +12,10 @@ import com.mobilewebbridge.MWB
 import com.mobilewebbridge.MWBActivity
 import com.mobilewebbridge.MWBConfiguration
 import com.mobilewebbridge.MWBHost
+import com.mobilewebbridge.MWBNavigationBarAppearance
+import com.mobilewebbridge.MWBBackButtonStyle
+import com.mobilewebbridge.MWBTitleFontWeight
+import android.graphics.Color
 import org.json.JSONObject
 
 /** 进程启动时安装宿主能力，避免持有页面 Activity 导致泄漏。 */
@@ -47,7 +51,10 @@ class SampleWebActivity : MWBActivity() {
         intent.replaceExtras(Bundle().apply {
             // 默认来源为 setOf("*")，允许 HTTP(S) 跳转及桥调用；可显式传入来源收紧范围。
             putSerializable(EXTRA_CONFIGURATION,
-                MWBConfiguration("file:///android_asset/index.html"))
+                MWBConfiguration("file:///android_asset/index.html", navigationBarAppearance = MWBNavigationBarAppearance(
+                    color = Color.rgb(246, 251, 250), titleColor = Color.rgb(11, 65, 72), buttonColor = Color.rgb(4, 159, 145),
+                    backButtonStyle = MWBBackButtonStyle.ARROW_TEXT, separatorVisible = true,
+                    titleFontSize = 17f, titleFontWeight = MWBTitleFontWeight.SEMIBOLD, buttonFontSize = 16f)))
         })
         // 必须先于 super.onCreate 注册，才能收到首次 loading；不要覆盖 WebViewClient。
         onLoadStateChange = { state ->

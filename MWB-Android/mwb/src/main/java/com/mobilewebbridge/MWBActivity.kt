@@ -42,6 +42,7 @@ open class MWBActivity : Activity() {
         internal const val EXTRA_INITIAL_OVERRIDE = "com.mobilewebbridge.initialOverride"
         internal const val EXTRA_TITLE_OVERRIDE = "com.mobilewebbridge.titleOverride"
         internal const val EXTRA_NAVIGATION_HIDDEN = "com.mobilewebbridge.navigationHidden"
+        internal const val EXTRA_NAVIGATION_APPEARANCE = "com.mobilewebbridge.navigationAppearance"
         private val containers = mutableListOf<WeakReference<MWBActivity>>()
         fun createIntent(context: Context, configuration: MWBConfiguration): Intent =
             Intent(context, MWBActivity::class.java).putExtra(EXTRA_CONFIGURATION, configuration)
@@ -90,9 +91,15 @@ open class MWBActivity : Activity() {
     private var savedHistory: Bundle? = null
     private var titleView: TextView? = null
     private var backButton: ImageButton? = null
+    private var backTextButton: Button? = null
+    private var navigationContentView: FrameLayout? = null
+    private var navigationSeparator: View? = null
+    private var navigationStyle = MWBNavigationBarAppearance()
+    private var navigationShowsBack = true
     private var closeButton: Button? = null
     private var actionButton: Button? = null
     private var navigationActionExt: String? = null
+    private var navigationActionDocument: String? = null
     private lateinit var policy: MWBNavigationPolicy
     @Volatile private var trustedPage = false
     private var bridge: MWBBridgeAdapter? = null
@@ -143,8 +150,17 @@ open class MWBActivity : Activity() {
         connectivity.registerDefaultNetworkCallback(networkCallback!!)
         webView = view
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setBackgroundColor(Color.WHITE) }
-        val navigationContent = FrameLayout(this)
+        val bar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
+        val navigationContent = object : FrameLayout(this) {
+            override fun measureChildWithMargins(child: View, parentWidthMeasureSpec: Int, widthUsed: Int,
+                parentHeightMeasureSpec: Int, heightUsed: Int) {
+                // 两侧各用不超过半栏的宽度；长返回文案不能盖住关闭/操作按钮。
+                val side = child !== titleView
+                val reserved = if (side && MeasureSpec.getMode(parentWidthMeasureSpec) != MeasureSpec.UNSPECIFIED)
+                    MeasureSpec.getSize(parentWidthMeasureSpec) / 2 + dp(8) else widthUsed
+                super.measureChildWithMargins(child, parentWidthMeasureSpec, maxOf(widthUsed, reserved), parentHeightMeasureSpec, heightUsed)
+            }
+        }
         val navigationHeight = dp(56)
         val back = ImageButton(this).apply {
             setImageResource(R.drawable.mwb_arrow_back)
@@ -152,6 +168,14 @@ open class MWBActivity : Activity() {
             background = null
             contentDescription = "返回"
             setPadding(dp(12), dp(12), dp(12), dp(12))
+            setOnClickListener { onBackPressed() }
+        }
+        val backText = Button(this).apply {
+            // 箭头和文字共享一个原生点击区域，继续进入现有返回事件链。
+            setAllCaps(false); background = null; minimumWidth = dp(48); minimumHeight = dp(48)
+            setPadding(dp(12), 0, dp(12), 0)
+            setSingleLine(); ellipsize = TextUtils.TruncateAt.END
+            visibility = View.GONE
             setOnClickListener { onBackPressed() }
         }
         val title = TextView(this).apply {
@@ -165,6 +189,7 @@ open class MWBActivity : Activity() {
         val trailing = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val close = Button(this).apply {
             text = "关闭"
+            setSingleLine(); ellipsize = TextUtils.TruncateAt.END
             setAllCaps(false)
             setTextColor(Color.BLACK)
             background = null
@@ -174,6 +199,7 @@ open class MWBActivity : Activity() {
             visibility = View.GONE
         }
         val action = Button(this).apply {
+            setSingleLine(); ellipsize = TextUtils.TruncateAt.END
             setAllCaps(false)
             setTextColor(Color.BLACK)
             background = null
@@ -182,9 +208,10 @@ open class MWBActivity : Activity() {
             visibility = View.GONE
             setOnClickListener {
                 // 按钮事件只发送给当前可信页面，不把 JS 函数作为原生参数保存。
-                if (trustedPage) {
+                if (trustedPage && isResumedForNavigation && !isFinishing && !isRedirecting &&
+                    navigationActionDocument != null && navigationActionDocument == pluginSession.replyDocumentId()) {
                     val payload = navigationActionExt?.let { mapOf("actionExt" to it) } ?: emptyMap<String, String>()
-                    callJsHandler("navigationActionClick", arrayOf<Any>(payload))
+                    webView?.callHandlerForDocument("mwb.navigationActionClick", arrayOf<Any>(payload), navigationActionDocument)
                 }
             }
         }
@@ -193,18 +220,23 @@ open class MWBActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         navigationContent.addView(back, FrameLayout.LayoutParams(
             dp(52), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
+        navigationContent.addView(backText, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
         trailing.addView(close, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         trailing.addView(action, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         navigationContent.addView(trailing, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END))
         navigationContent.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            val inset = maxOf(back.width, trailing.width) + dp(8)
+            val backWidth = if (backText.visibility == View.VISIBLE) backText.width else if (back.visibility == View.VISIBLE) back.width else 0
+            val inset = maxOf(backWidth, trailing.width) + dp(8)
             if (title.paddingLeft != inset) title.setPadding(inset, 0, inset, 0)
         }
         bar.addView(navigationContent, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, navigationHeight))
+        val separator = View(this).apply { visibility = View.GONE }
+        bar.addView(separator, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxOf(1, dp(1))))
         val loading = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true; visibility = View.GONE }
         root.addView(bar)
         root.addView(loading, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 3))
@@ -213,11 +245,15 @@ open class MWBActivity : Activity() {
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         navigationBar = bar
         backButton = back
+        backTextButton = backText
+        navigationContentView = navigationContent
+        navigationSeparator = separator
         titleView = title
         closeButton = close
         actionButton = action
         progress = loading
         setContentView(root)
+        configuration.navigationBarAppearance?.let { navigationStyle = it; renderNavigationAppearance() }
         // navigateTo 的新页面可在首帧前决定是否显示导航栏。
         if (intent.hasExtra(EXTRA_NAVIGATION_HIDDEN)) {
             applyNavigationTheme(JSONObject().put("hidden", intent.getBooleanExtra(EXTRA_NAVIGATION_HIDDEN, true)))
@@ -225,6 +261,7 @@ open class MWBActivity : Activity() {
         errorPresenter = com.mobilewebbridge.errorpage.MWBErrorPagePresenter(this, content, configuration.errorPage,
             { retryFailedPage() }, { goHomeFromError() })
         MWB.host?.configureContainer(this)
+        (intent.getSerializableExtra(EXTRA_NAVIGATION_APPEARANCE) as? MWBNavigationBarPatch)?.let { applyNavigationPatch(it) }
         load(intent.getStringExtra(EXTRA_INITIAL_OVERRIDE) ?: configuration.initialUrl)
     }
 
@@ -440,6 +477,10 @@ open class MWBActivity : Activity() {
     /** 失效时立即撤销就绪资格，与现有插件文档使用相同边界。 */
     private fun invalidatePluginDocument() {
         isPageReady = false
+        actionButton?.visibility = View.GONE
+        actionButton?.text = ""
+        navigationActionExt = null
+        navigationActionDocument = null
         pluginSession.invalidate()
     }
 
@@ -476,32 +517,70 @@ open class MWBActivity : Activity() {
     /** 主题只接受当前壳实际支持的字段，避免 JS 收到虚假成功。 */
     fun applyNavigationTheme(params: JSONObject): Boolean {
         if (listOf("actionIcon", "translucentStatusBars").any(params::has)) return false
+        val patch = runCatching { MWBNavigationBarPatch.parse(params) }.getOrElse { return false }
         if (params.has("hidden")) navigationBar?.visibility = if (params.optBoolean("hidden")) View.GONE else View.VISIBLE
         if (params.has("title")) { title = params.optString("title"); titleView?.text = title }
-        if (params.has("showBackButton")) backButton?.visibility = if (params.optBoolean("showBackButton")) View.VISIBLE else View.GONE
+        applyNavigationPatch(patch)
         if (params.has("showCloseButton")) closeButton?.visibility = if (params.optBoolean("showCloseButton")) View.VISIBLE else View.GONE
         if (params.has("actionTxt")) {
             val text = params.optString("actionTxt")
             actionButton?.text = text
-            actionButton?.setTextColor(titleView?.currentTextColor ?: Color.BLACK)
             actionButton?.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
-            navigationActionExt = params.optString("actionExt").takeIf { params.has("actionExt") }
+            if (params.has("actionExt")) navigationActionExt = params.optString("actionExt")
+            if (text.isBlank()) navigationActionExt = null
+            navigationActionDocument = pluginSession.replyDocumentId()
         } else if (params.has("actionExt")) navigationActionExt = params.optString("actionExt")
-        if (params.has("color")) runCatching { Color.parseColor("#${params.optString("color").removePrefix("#")}") }
-            .onSuccess { navigationBar?.setBackgroundColor(it) }.onFailure { return false }
-        if (params.has("titleColor")) runCatching { Color.parseColor("#${params.optString("titleColor").removePrefix("#")}") }
-            .onSuccess {
-                titleView?.setTextColor(it)
-                actionButton?.setTextColor(it)
-                closeButton?.setTextColor(it)
-                backButton?.imageTintList = ColorStateList.valueOf(it)
-            }.onFailure { return false }
         if (params.has("isBright")) {
             val flag = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
             window.decorView.systemUiVisibility = if (params.optBoolean("isBright"))
                 window.decorView.systemUiVisibility or flag else window.decorView.systemUiVisibility and flag.inv()
         }
         return true
+    }
+
+    /** 目标 Activity 创建前已校验，默认值和打开补丁按字段合并。 */
+    internal fun applyNavigationPatch(patch: MWBNavigationBarPatch) {
+        navigationStyle = navigationStyle.merge(patch.appearance)
+        patch.showBackButton?.let { navigationShowsBack = it }
+        renderNavigationAppearance()
+    }
+
+    private fun renderNavigationAppearance() {
+        val style = navigationStyle
+        style.color?.let { navigationBar?.setBackgroundColor(it) }
+        style.titleColor?.let { titleView?.setTextColor(it) }
+        val buttonColor = style.buttonColor ?: style.titleColor ?: Color.BLACK
+        actionButton?.setTextColor(buttonColor); closeButton?.setTextColor(buttonColor); backTextButton?.setTextColor(buttonColor)
+        backButton?.imageTintList = ColorStateList.valueOf(buttonColor)
+        // 显式箭头样式也随系统 RTL 镜像；无外观配置时保持旧入口不变。
+        if (style.backButtonStyle == MWBBackButtonStyle.ARROW) backButton?.drawable?.isAutoMirrored = true
+        style.titleFontSize?.let { titleView?.textSize = it }
+        style.titleFontWeight?.let { weight ->
+            titleView?.typeface = if (android.os.Build.VERSION.SDK_INT >= 28)
+                android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, weight.weight, false)
+            else android.graphics.Typeface.create(if (weight.weight == 500) "sans-serif-medium" else "sans-serif",
+                if (weight.weight >= 600) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+        }
+        style.buttonFontSize?.let { size -> actionButton?.textSize = size; closeButton?.textSize = size; backTextButton?.textSize = size }
+        val textBack = style.backButtonStyle == MWBBackButtonStyle.TEXT || style.backButtonStyle == MWBBackButtonStyle.ARROW_TEXT
+        backButton?.visibility = if (navigationShowsBack && !textBack) View.VISIBLE else View.GONE
+        backTextButton?.visibility = if (navigationShowsBack && textBack) View.VISIBLE else View.GONE
+        val label = style.backButtonText ?: "返回"
+        backButton?.contentDescription = label; backTextButton?.text = label; backTextButton?.contentDescription = label
+        val arrow = if (style.backButtonStyle == MWBBackButtonStyle.ARROW_TEXT) getDrawable(R.drawable.mwb_arrow_back)?.mutate()?.apply {
+            setTint(buttonColor); isAutoMirrored = true; setBounds(0, 0, dp(24), dp(24))
+        } else null
+        backTextButton?.setCompoundDrawablesRelative(arrow, null, null, null)
+        backTextButton?.compoundDrawablePadding = dp(4)
+        style.separatorVisible?.let { navigationSeparator?.visibility = if (it) View.VISIBLE else View.GONE }
+        navigationSeparator?.setBackgroundColor(style.separatorColor ?: Color.rgb(218, 218, 218))
+        // sp 字体按系统缩放，放大后允许内容行增高；普通字号仍保持原 56dp。
+        val largest = maxOf(titleView?.textSize ?: 0f, actionButton?.textSize ?: 0f, backTextButton?.textSize ?: 0f)
+        navigationContentView?.layoutParams?.let { params ->
+            params.height = maxOf(dp(56), (largest * 1.5f).toInt() + dp(16))
+            navigationContentView?.layoutParams = params
+        }
+        navigationContentView?.requestLayout()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()

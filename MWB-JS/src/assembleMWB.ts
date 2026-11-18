@@ -31,17 +31,26 @@ export function assembleMWB(plugins: MWBPlugin[]): MWBPartialSDK {
     ((param: Omit<ParamNavigationBarTheme, "onActionClick">) => ReturnType<MWBJSSDK["setNavigationBarTheme"]>) | undefined;
   if (nativeSetTheme) {
     let currentActionClick: ((data: { actionExt?: string }) => void) | undefined;
+    // 串行提交使原生样式与 JS 回调按调用顺序一起生效；拒绝不会阻断后续补丁。
+    let themeQueue: Promise<unknown> = Promise.resolve();
     methods.setNavigationBarTheme = async (param: ParamNavigationBarTheme) => {
       // DSBridge 会序列化参数；回调留在当前 SDK 实例，原生只接收按钮配置。
       const { onActionClick, ...nativeParam } = param;
-      const result = await nativeSetTheme(nativeParam);
-      if (currentActionClick) events.unRegisterHandler("navigationActionClick", currentActionClick);
-      currentActionClick = undefined;
-      if (nativeParam.actionTxt?.trim() && onActionClick) {
-        events.registerHandler("navigationActionClick", onActionClick);
-        currentActionClick = onActionClick;
+      if (onActionClick !== undefined && typeof onActionClick !== "function") {
+        throw new TypeError("onActionClick must be a function");
       }
-      return result;
+      const request = themeQueue.then(async () => {
+        const result = await nativeSetTheme(nativeParam);
+        const clearsAction = typeof nativeParam.actionTxt === "string" && !nativeParam.actionTxt.trim();
+        if (clearsAction || onActionClick !== undefined) {
+          if (currentActionClick) events.unRegisterHandler("navigationActionClick", currentActionClick);
+          currentActionClick = clearsAction ? undefined : onActionClick;
+          if (currentActionClick) events.registerHandler("navigationActionClick", currentActionClick);
+        }
+        return result;
+      });
+      themeQueue = request.catch(() => undefined);
+      return request;
     };
   }
   const basic = Object.freeze({ ...methods, ...events });

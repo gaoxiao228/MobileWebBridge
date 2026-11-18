@@ -4,6 +4,232 @@ import WebKit
 @testable import MobileWebBridge
 
 final class NavigationTests: XCTestCase {
+    func testStyledDemoPushReplacementAndNativeBackRestoreAppearance() throws {
+        // 真实 H5 配置页发起替换，并保存包含导航栏的完整窗口截图。
+        let (window, navigation, root) = try readyNavigationContext()
+        defer { window.isHidden = true; MWBWebViewPrewarmer.shared.discard() }
+        XCTAssertEqual(theme(root, ["hidden": false, "title": "根页", "buttonColor": "008800"]), 0)
+        let url = root.configuration.initialURL.deletingLastPathComponent().appendingPathComponent("navigation-theme.html")
+        func script(_ page: MWBWebViewController, _ source: String) {
+            let done = expectation(description: "real Demo interaction")
+            page.webView?.evaluateJavaScript(source) { _, error in XCTAssertNil(error); done.fulfill() }
+            wait(for: [done], timeout: 5)
+        }
+        func waitForPage(after previous: MWBWebViewController) throws -> MWBWebViewController {
+            let appeared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                guard let page = navigation.topViewController as? MWBWebViewController else { return false }
+                return page !== previous && page.loadState == .loaded && navigation.transitionCoordinator == nil
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [appeared], timeout: 10), .completed)
+            return try XCTUnwrap(navigation.topViewController as? MWBWebViewController)
+        }
+        func capture(_ name: String) {
+            window.layoutIfNeeded()
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        script(root, "void mwb.navigateTo({url:'\(url.absoluteString)',title:'初始样式',hidden:false,color:'f6fbfa',titleColor:'0b4148',buttonColor:'049f91',backButtonStyle:'arrowText',titleFontSize:17,buttonFontSize:16}); 'started';")
+        let source = try waitForPage(after: root)
+        XCTAssertEqual(navigation.navigationBar.tintColor, UIColor(red: 4/255, green: 159/255, blue: 145/255, alpha: 1))
+        capture("navigation-appearance-initial")
+        script(source, """
+            const set=(name,value)=>{const el=document.querySelector(`[name="${name}"]`);el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));};
+            const hidden=document.querySelector('[name="hidden"]');hidden.checked=false;hidden.dispatchEvent(new Event('change',{bubbles:true}));
+            set('buttonColor','#0066cc');set('titleFontSize','32');set('buttonFontSize','28');set('backButtonText','返回');
+            setTimeout(()=>document.querySelector('.theme-replace-page').click(),0); 'started';
+            """)
+        let target = try waitForPage(after: source)
+        XCTAssertEqual(navigation.viewControllers.count, 2)
+        XCTAssertFalse(navigation.isNavigationBarHidden)
+        XCTAssertEqual(navigation.navigationBar.tintColor, UIColor(red: 0, green: 102/255, blue: 204/255, alpha: 1))
+        let font = try XCTUnwrap(navigation.navigationBar.standardAppearance.titleTextAttributes[.font] as? UIFont)
+        XCTAssertLessThanOrEqual(font.pointSize, 32)
+        capture("navigation-appearance-replacement-large-type")
+        let back = try XCTUnwrap(target.navigationItem.leftBarButtonItem?.customView as? UIButton)
+        XCTAssertGreaterThanOrEqual(back.bounds.width, 44)
+        back.sendActions(for: .touchUpInside)
+        let returned = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            navigation.topViewController === root && navigation.transitionCoordinator == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 5), .completed)
+        XCTAssertEqual(navigation.navigationBar.tintColor, UIColor(red: 0, green: 136/255, blue: 0, alpha: 1))
+        capture("navigation-appearance-returned-root")
+    }
+
+    func testSeparatorColorPreservesHiddenHostBaseline() throws {
+        // 透明色和有效透明阴影图都属于隐藏基线；无像素 UIImage() 会被新 UIKit 当成 nil。
+        for useImage in [false, true] {
+            let navigation = UINavigationController(rootViewController: UIViewController())
+            navigation.loadViewIfNeeded()
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            if useImage {
+                appearance.shadowImage = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1))
+                    .image { _ in }.withRenderingMode(.alwaysOriginal)
+            } else { appearance.shadowColor = .clear }
+            navigation.navigationBar.standardAppearance = appearance
+            var snapshot = MWBNavigationBarSnapshot(navigation)
+            func checkHidden(_ value: UINavigationBarAppearance) {
+                if useImage { XCTAssertEqual(value.shadowImage?.size, CGSize(width: 1, height: 1)) }
+                else { XCTAssertEqual(value.shadowColor?.cgColor.alpha ?? 0, 0) }
+            }
+            checkHidden(snapshot.standard)
+            snapshot.apply(.init(color: .white, separatorColor: .red), traits: .init())
+            checkHidden(snapshot.standard)
+            snapshot.apply(.init(separatorVisible: true, separatorColor: .red), traits: .init())
+            XCTAssertEqual(snapshot.standard.shadowColor, .red)
+            XCTAssertNil(snapshot.standard.shadowImage)
+        }
+    }
+
+    func testHostDefaultAndOpeningPatchMergeWithoutChangingSourceDuringPreparation() throws {
+        // 真实离屏目标没有 navigationController，早期主题仍须在显示时完整生效。
+        let (window, navigation, root) = try readyNavigationContext()
+        defer { window.isHidden = true }
+        let originalTint = navigation.navigationBar.tintColor
+        let defaults = MWBNavigationBarAppearance(titleColor: .red, buttonColor: .green,
+            backButtonStyle: .arrowText, titleFontSize: 17, buttonFontSize: 16)
+        let target = MWBWebViewController(configuration: .init(initialURL: root.configuration.initialURL,
+            allowedOrigins: [], navigationBarAppearance: defaults))
+        target.configureInitialNavigationBar(try .parse(["titleColor": "0000ff", "separatorVisible": false], strict: true))
+        target.initialNavigationBarHidden = false
+        target.loadViewIfNeeded()
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in target.loadState == .loaded }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        XCTAssertEqual(theme(target, ["titleColor": "ffffff"]), 0)
+        XCTAssertEqual(navigation.navigationBar.tintColor, originalTint)
+        XCTAssertFalse(navigation.mwbNavigationState.isolated)
+        navigation.pushViewController(target, animated: false)
+        target.beginAppearanceTransition(true, animated: false); target.endAppearanceTransition()
+        XCTAssertEqual(navigation.navigationBar.tintColor, .green)
+        XCTAssertTrue(navigation.mwbNavigationState.isolated)
+        XCTAssertEqual(navigation.navigationBar.standardAppearance.titleTextAttributes[.foregroundColor] as? UIColor,
+                       UIColor(red: 1, green: 1, blue: 1, alpha: 1))
+        let back = try XCTUnwrap(target.navigationItem.leftBarButtonItem?.customView as? UIButton)
+        XCTAssertEqual(back.title(for: .normal), "返回")
+        XCTAssertNotNil(back.image(for: .normal))
+        XCTAssertGreaterThanOrEqual(back.bounds.height, 44)
+    }
+
+    func testBackgroundParentUpdateRestoresOnlyAfterPopAndReloadClearsDocumentAction() throws {
+        let (window, navigation, root) = try readyNavigationContext()
+        defer { window.isHidden = true }
+        XCTAssertEqual(theme(root, ["buttonColor": "049f91", "actionTxt": "根操作", "actionExt": "root"]), 0)
+        let child = MWBWebViewController(configuration: root.configuration)
+        navigation.pushViewController(child, animated: false)
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in child.loadState == .loaded }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        child.beginAppearanceTransition(true, animated: false); child.endAppearanceTransition()
+        XCTAssertEqual(theme(child, ["buttonColor": "ff0000", "hidden": false]), 0)
+        XCTAssertEqual(theme(root, ["buttonColor": "0000ff", "hidden": true]), 0)
+        XCTAssertEqual(navigation.navigationBar.tintColor, UIColor(red: 1, green: 0, blue: 0, alpha: 1))
+        XCTAssertFalse(navigation.isNavigationBarHidden)
+        navigation.popViewController(animated: false)
+        root.beginAppearanceTransition(true, animated: false); root.endAppearanceTransition()
+        XCTAssertTrue(navigation.isNavigationBarHidden)
+        XCTAssertEqual(navigation.navigationBar.tintColor, UIColor(red: 0, green: 0, blue: 1, alpha: 1))
+        XCTAssertEqual(root.navigationItem.rightBarButtonItem?.title, "根操作")
+        root.load(root.configuration.initialURL)
+        XCTAssertNil(root.navigationItem.rightBarButtonItem)
+        XCTAssertNil(root.currentNavigationActionExt)
+    }
+
+    func testAppearanceValidationAndLegacyIsolationBoundary() throws {
+        for params: [String: Any] in [["buttonColor": NSNull()], ["showBackButton": 1], ["separatorVisible": "true"],
+            ["backButtonText": " "], ["backButtonStyle": "custom"], ["titleFontWeight": "heavy"],
+            ["titleFontSize": true], ["buttonFontSize": 29], ["separatorColor": "#12345678"]] {
+            XCTAssertThrowsError(try MWBNavigationBarPatch.parse(params))
+        }
+        let (window, navigation, root) = try readyNavigationContext()
+        defer { window.isHidden = true }
+        XCTAssertEqual(theme(root, ["titleColor": "112233"]), 0)
+        XCTAssertFalse(navigation.mwbNavigationState.isolated)
+        let child = MWBWebViewController(configuration: root.configuration)
+        navigation.pushViewController(child, animated: false)
+        child.beginAppearanceTransition(true, animated: false); child.endAppearanceTransition()
+        XCTAssertEqual(navigation.navigationBar.tintColor, UIColor(red: 17/255, green: 34/255, blue: 51/255, alpha: 1))
+        XCTAssertEqual(theme(child, ["buttonColor": "bad"]), -1001)
+        XCTAssertFalse(navigation.mwbNavigationState.isolated)
+        let other = UINavigationController(rootViewController: UIViewController())
+        XCTAssertFalse(other.mwbNavigationState.isolated)
+    }
+
+    private func theme(_ page: MWBWebViewController, _ values: [String: Any]) -> Int? {
+        let reply = expectation(description: "theme response")
+        var code: Int?
+        let adapter = MWBBridgeAdapter(controller: page)
+        adapter.setNavigationBarTheme(values) { value, _ in
+            code = MWBResult.parse(value)?.errCode
+            reply.fulfill()
+        }
+        wait(for: [reply], timeout: 3)
+        withExtendedLifetime(adapter) {}
+        return code
+    }
+
+    func testIndependentButtonColorSurvivesTitleAndActionUpdates() throws {
+        // 标题更新和新建操作按钮都不得覆盖显式按钮色。
+        let (window, navigation, page) = try readyNavigationContext()
+        defer { window.isHidden = true }
+        XCTAssertEqual(theme(page, ["titleColor": "0b4148", "buttonColor": "049f91"]), 0)
+        let buttons = UIColor(red: 4/255, green: 159/255, blue: 145/255, alpha: 1)
+        XCTAssertEqual(navigation.navigationBar.tintColor, buttons)
+        XCTAssertEqual(theme(page, ["titleColor": "ffffff", "actionTxt": "保存"]), 0)
+        XCTAssertEqual(navigation.navigationBar.tintColor, buttons)
+        XCTAssertEqual(navigation.navigationBar.standardAppearance.titleTextAttributes[.foregroundColor] as? UIColor,
+                       UIColor(red: 1, green: 1, blue: 1, alpha: 1))
+    }
+
+    func testInvalidAppearanceRejectsWholeThemeAndNavigation() throws {
+        // 错误样式不能先改标题，也不能创建/替换目标容器。
+        let (window, navigation, page) = try readyNavigationContext()
+        defer { window.isHidden = true }
+        page.title = "原页"
+        XCTAssertEqual(theme(page, ["title": "不应应用", "buttonColor": "bad"]), -1001)
+        XCTAssertEqual(page.title, "原页")
+        for method in ["navigateTo", "redirectTo"] {
+            let replied = expectation(description: method)
+            let adapter = MWBBridgeAdapter(controller: page)
+            let callback: MWBJSCallback = { value, _ in
+                XCTAssertEqual(MWBResult.parse(value)?.errCode, -1001)
+                replied.fulfill()
+            }
+            let args: [String: Any] = ["url": page.configuration.initialURL.absoluteString, "titleFontSize": 100]
+            if method == "navigateTo" { adapter.navigateTo(args, handler: callback) }
+            else { adapter.redirectTo(args, handler: callback) }
+            wait(for: [replied], timeout: 3)
+            XCTAssertTrue(navigation.topViewController === page)
+        }
+    }
+
+    func testNavigationCarriesAppearanceBeforeTargetFirstDisplay() throws {
+        let (window, navigation, page) = try readyNavigationContext()
+        defer { window.isHidden = true }
+        let replied = expectation(description: "styled navigation")
+        MWBBridgeAdapter(controller: page).navigateTo([
+            "url": page.configuration.initialURL.absoluteString, "hidden": false,
+            "color": "f6fbfa", "titleColor": "0b4148", "buttonColor": "049f91",
+            "backButtonStyle": "arrowText", "backButtonText": "返回", "showBackButton": false,
+            "separatorVisible": false, "titleFontSize": 17, "titleFontWeight": "semibold", "buttonFontSize": 16
+        ]) { value, _ in
+            XCTAssertEqual(MWBResult.parse(value)?.errCode, 0)
+            replied.fulfill()
+        }
+        wait(for: [replied], timeout: 3)
+        let child = try XCTUnwrap(navigation.topViewController as? MWBWebViewController)
+        XCTAssertFalse(child === page)
+        child.beginAppearanceTransition(true, animated: false)
+        child.endAppearanceTransition()
+        XCTAssertFalse(navigation.isNavigationBarHidden)
+        XCTAssertNil(child.navigationItem.leftBarButtonItem)
+        XCTAssertEqual(navigation.navigationBar.tintColor, UIColor(red: 4/255, green: 159/255, blue: 145/255, alpha: 1))
+        XCTAssertEqual(navigation.navigationBar.standardAppearance.shadowColor ?? .clear, .clear)
+        XCTAssertTrue(child.navigationItem.hidesBackButton)
+    }
+
     func testRedirectDemoThroughRealJavaScriptBridgeReturnsToSameP() throws {
         // 使用同步到 App 的实际 SDK/H5，覆盖原生桥接、页面身份和完整返回栈。
         let (window, navigation, previous) = try readyNavigationContext()

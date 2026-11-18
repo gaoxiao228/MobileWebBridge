@@ -96,3 +96,54 @@ test("navigation text action calls the current JS callback without sending the f
   expect(oldClick).toHaveBeenCalledOnce();
   expect(newClick).toHaveBeenCalledWith({ actionExt: "final" });
 });
+
+test("partial theme updates preserve the action callback and clearing removes it", async () => {
+  // 外观补丁不应撤销当前文档已经注册的操作。
+  const handlers = new Map<string, (data: unknown) => void>();
+  vi.stubGlobal("window", { _dsbridge: {}, dsBridge: {
+    register(name: string, handler: (data: unknown) => void) { handlers.set(name, handler); },
+    call(_name: string, _args: unknown, callback?: (value: unknown) => void) { callback?.({ errCode: 0 }); }
+  } });
+  const sdk = createMWB();
+  const click = vi.fn();
+  await sdk.setNavigationBarTheme({ actionTxt: "保存", onActionClick: click });
+  for (const patch of [{ hidden: false }, { titleColor: "112233" }, { actionExt: "new" }, { actionTxt: "完成" }]) {
+    await sdk.setNavigationBarTheme(patch);
+    handlers.get("mwb.navigationActionClick")?.({ actionExt: "new" });
+  }
+  expect(click).toHaveBeenCalledTimes(4);
+  await sdk.setNavigationBarTheme({ actionTxt: "" });
+  handlers.get("mwb.navigationActionClick")?.({});
+  expect(click).toHaveBeenCalledTimes(4);
+});
+
+test("theme calls are serialized and a native rejection does not discard the old handler or stop the queue", async () => {
+  // 原生回复可异步；后发补丁必须等待前一个结束，失败也应释放队列。
+  const handlers = new Map<string, (data: unknown) => void>();
+  const replies: Array<(value: unknown) => void> = [];
+  vi.stubGlobal("window", { _dsbridge: {}, dsBridge: {
+    register(name: string, handler: (data: unknown) => void) { handlers.set(name, handler); },
+    call(_name: string, _args: unknown, callback?: (value: unknown) => void) { if (callback) replies.push(callback); }
+  } });
+  const sdk = createMWB();
+  const click = vi.fn();
+  const initial = sdk.setNavigationBarTheme({ actionTxt: "保存", onActionClick: click });
+  await Promise.resolve();
+  replies.shift()!({ errCode: 0 });
+  await initial;
+  const failed = sdk.setNavigationBarTheme({ actionTxt: "错误", onActionClick: vi.fn() });
+  const rejection = expect(failed).rejects.toMatchObject({ errCode: -1001 });
+  const next = sdk.setNavigationBarTheme({ hidden: false });
+  await Promise.resolve();
+  expect(replies).toHaveLength(1);
+  replies.shift()!({ errCode: -1001, errMsg: "invalid" });
+  await rejection;
+  await new Promise(resolve => setTimeout(resolve, 0));
+  handlers.get("mwb.navigationActionClick")?.({});
+  expect(click).toHaveBeenCalledOnce();
+  replies.shift()!({ errCode: 0 });
+  await next;
+  handlers.get("mwb.navigationActionClick")?.({});
+  expect(click).toHaveBeenCalledTimes(2);
+  await expect(sdk.setNavigationBarTheme({ onActionClick: "bad" } as never)).rejects.toThrow();
+});

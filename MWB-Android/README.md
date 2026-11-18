@@ -41,8 +41,8 @@ MWB WebView 默认禁用页面双指缩放和系统长按选项；普通点击�
 
 宿主收到推送后可调用当前容器的 `sendEvent("remoteNotificationReceive", payload)`。Kotlin 调用 H5 句柄使用 `callJsHandler("handlerName", arrayOf(arg)) { result -> ... }`。`exitApp()` 默认仅关闭当前 MWB Activity，若宿主实现 `closeContainer()` 则由宿主自行处理。
 
-`setNavigationBarTheme` 支持右上角文字按钮 `actionTxt`；网页传入 `onActionClick` 可接收点击事件和 `actionExt`。按钮文字跟随导航栏标题颜色，传入空 `actionTxt` 可移除按钮。图片按钮 `actionIcon` 暂不支持。
-Android 导航栏标题始终按整条栏居中；返回控件显示左箭头，右侧“关闭”和操作控件只显示文字。设置 `titleColor` 时，标题、箭头和右侧文字同步变色。
+`setNavigationBarTheme` 支持右上角文字按钮 `actionTxt`；网页传入 `onActionClick` 可接收点击事件和 `actionExt`。未显式配置 buttonColor 时，按钮文字跟随标题颜色，传入空 `actionTxt` 可移除按钮。图片按钮 `actionIcon` 暂不支持。
+Android 标题按整栏居中；旧调用默认箭头返回且标题/按钮同色。当前未发布源码新增独立按钮色和可配置返回展示，见[原生导航栏外观](../docs/navigation-bar.md)。
 
 扫码使用 Google Code Scanner，需要设备具备 Google Play 服务；无此服务时返回 `-1004`。此组件不提供相册扫码，显式传入 `hideAlbum: false` 返回 `-1004`。相机、旧版 Android 相册写入权限由库请求，用户拒绝返回 `-1008`。图片路径是 MWB 私有缓存目录中的文件，`convertImagePathToBase64` 和 `openFile` 不读取任意外部路径。`chooseImage` 的相机分支返回系统相机的缩略图；需要全分辨率照片时可在宿主扩展。
 
@@ -151,3 +151,5 @@ Android 在子类的 `super.onCreate` 前安装回调，并让宿主 Manifest/In
 [SampleWebActivity](sample/src/main/java/com/mobilewebbridge/sample/SampleActivity.kt) 演示加载与就绪闭包的注册，结果记录在 `MWB-Lifecycle` 日志中。H5 Demo 不自动发送就绪通知，也不提供相关操作入口；接入方应由自己的业务页面在关键内容呈现后报告。
 
 双端代码示例、就绪去重、重载与兼容性见 [容器加载状态与首屏就绪](../docs/page-lifecycle.md)。
+
+当前未发布源码支持三个导航方法共用外观参数和 MWBConfiguration.navigationBarAppearance 宿主默认主题，目标首帧前应用；已发布 0.1.5 不包含这些扩展。字段、合并、兼容和原生配置示例见[原生导航栏外观](../docs/navigation-bar.md)。

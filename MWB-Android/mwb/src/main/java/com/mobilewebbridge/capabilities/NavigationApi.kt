@@ -8,6 +8,7 @@ import android.widget.Toast
 import com.mobilewebbridge.MWB
 import com.mobilewebbridge.MWBActivity
 import com.mobilewebbridge.MWBResult
+import com.mobilewebbridge.MWBNavigationBarPatch
 import org.json.JSONObject
 import wendu.dsbridge.CompletionHandler
 import wendu.dsbridge.DWebView
@@ -32,8 +33,10 @@ class NavigationApi(private val activity: MWBActivity) {
         val params = arg as? JSONObject
         val url = params?.optString("url").orEmpty()
         if (!activity.isTrusted(url)) return cb.complete(MWBResult.failure(-1001, "Invalid or untrusted URL"))
-        if (params != null && params.keys().asSequence().any { it !in setOf("url", "title", "hidden") })
+        if (params != null && params.keys().asSequence().any { it !in setOf("url", "title", "hidden") + MWBNavigationBarPatch.keys })
             return cb.complete(MWBResult.failure(-1004, "Unsupported navigateTo options"))
+        val appearance = try { MWBNavigationBarPatch.parse(params ?: JSONObject(), strict = true) }
+        catch (_: IllegalArgumentException) { return cb.complete(MWBResult.failure(-1001, "Invalid navigation appearance")) }
         activity.runOnUiThread {
             // 已提交替换的旧 Activity 不能再通过 navigateTo 创建另一条页面链。
             if (activity.isRedirecting || activity.isFinishing || activity.isDestroyed)
@@ -42,6 +45,7 @@ class NavigationApi(private val activity: MWBActivity) {
             val next = MWBActivity.createIntent(activity, activity.configuration)
                 .putExtra(MWBActivity.EXTRA_INITIAL_OVERRIDE, url)
                 .putExtra(MWBActivity.EXTRA_NAVIGATION_HIDDEN, params?.optBoolean("hidden", true) ?: true)
+                .putExtra(MWBActivity.EXTRA_NAVIGATION_APPEARANCE, appearance)
             params?.optString("title")?.takeIf(String::isNotEmpty)?.let { next.putExtra(MWBActivity.EXTRA_TITLE_OVERRIDE, it) }
             activity.startActivity(next)
             // 主线程串行记录启动结果，覆盖 startActivity 到 onPause 之间的窗口。
@@ -64,8 +68,10 @@ class NavigationApi(private val activity: MWBActivity) {
         val url = params?.opt("url") as? String
         if (url == null || !activity.isTrusted(url))
             return cb.complete(MWBResult.failure(-1001, "Invalid or untrusted URL"))
-        if (params.keys().asSequence().any { it !in setOf("url", "title", "hidden") })
+        if (params.keys().asSequence().any { it !in setOf("url", "title", "hidden") + MWBNavigationBarPatch.keys })
             return cb.complete(MWBResult.failure(-1004, "Unsupported redirectTo options"))
+        val appearance = try { MWBNavigationBarPatch.parse(params, strict = true) }
+        catch (_: IllegalArgumentException) { return cb.complete(MWBResult.failure(-1001, "Invalid navigation appearance")) }
         if ((params.has("hidden") && params.opt("hidden") !is Boolean) ||
             (params.has("title") && params.opt("title") !is String))
             return cb.complete(MWBResult.failure(-1001, "Invalid redirectTo field types"))
@@ -79,6 +85,7 @@ class NavigationApi(private val activity: MWBActivity) {
             val next = MWBActivity.createIntent(activity, activity.configuration)
                 .putExtra(MWBActivity.EXTRA_INITIAL_OVERRIDE, url)
                 .putExtra(MWBActivity.EXTRA_NAVIGATION_HIDDEN, params.optBoolean("hidden", true))
+                .putExtra(MWBActivity.EXTRA_NAVIGATION_APPEARANCE, appearance)
             if (params.has("title")) next.putExtra(MWBActivity.EXTRA_TITLE_OVERRIDE, params.getString("title"))
             activity.isRedirecting = true
             try {
@@ -107,7 +114,16 @@ class NavigationApi(private val activity: MWBActivity) {
 
     fun setNavigationBarTheme(arg: Any, cb: CompletionHandler<Any>) {
         val params = arg as? JSONObject ?: JSONObject()
+        if (listOf("actionIcon", "translucentStatusBars").any(params::has))
+            return cb.complete(MWBResult.failure(-1004, "Unsupported navigation theme"))
+        try { MWBNavigationBarPatch.parse(params) }
+        catch (_: IllegalArgumentException) {
+            return cb.complete(MWBResult.failure(-1001, "Invalid navigation appearance"))
+        }
+        val document = activity.pluginSession.replyDocumentId()
         activity.runOnUiThread {
+            if (document != activity.pluginSession.replyDocumentId())
+                return@runOnUiThread cb.complete(MWBResult.failure(-1005, "Source document is no longer active"))
             cb.complete(if (activity.applyNavigationTheme(params)) MWBResult.success()
                 else MWBResult.failure(-1004, "Unsupported navigation theme"))
         }

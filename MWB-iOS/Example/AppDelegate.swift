@@ -35,7 +35,15 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 默认来源为 ["*"]，允许远程 HTTP(S) 跳转及桥调用；可显式传入来源收紧范围。
         // Xcode 的 Arguments Passed On Launch 加 --mwb-disable-prewarming 可对照冷启动路径。
         let prewarmingEnabled = !ProcessInfo.processInfo.arguments.contains("--mwb-disable-prewarming")
-        let configuration = MWBConfiguration(initialURL: url, webViewPrewarmingEnabled: prewarmingEnabled)
+        // 全局外观在目标首帧前初始化，页面的打开参数仍可逐字段覆盖。
+        let appearance = MWBNavigationBarAppearance(
+            color: UIColor(red: 246/255, green: 251/255, blue: 250/255, alpha: 1),
+            titleColor: UIColor(red: 11/255, green: 65/255, blue: 72/255, alpha: 1),
+            buttonColor: UIColor(red: 4/255, green: 159/255, blue: 145/255, alpha: 1),
+            backButtonStyle: .arrowText, separatorVisible: true,
+            titleFontSize: 17, titleFontWeight: .semibold, buttonFontSize: 16)
+        let configuration = MWBConfiguration(initialURL: url, webViewPrewarmingEnabled: prewarmingEnabled,
+                                             navigationBarAppearance: appearance)
         NSLog("[MWB-Prewarming] enabled=%@ (first page may still be cold)", String(prewarmingEnabled))
         let controller = ExampleWebViewController(configuration: configuration)
         controller.host = host

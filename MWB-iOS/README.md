@@ -176,3 +176,5 @@ iOS 在加载视图前注册闭包；也可继承容器并重写 `pageDidBecomeR
 示例 App 的 [ExampleWebViewController](Example/AppDelegate.swift) 演示加载回调注册及就绪方法重写，结果记录在 `MWB-Lifecycle` 日志中。H5 Demo 不自动发送就绪通知，也不提供相关操作入口；接入方应由自己的业务页面在关键内容呈现后报告。
 
 双端代码示例、就绪去重、重载与兼容性见 [容器加载状态与首屏就绪](../docs/page-lifecycle.md)。
+
+当前未发布源码支持三个导航方法共用外观参数和 MWBConfiguration.navigationBarAppearance 宿主默认主题，目标首帧前应用；已发布 0.1.5 不包含这些扩展。字段、合并、兼容和原生配置示例见[原生导航栏外观](../docs/navigation-bar.md)。

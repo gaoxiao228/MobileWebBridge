@@ -32,7 +32,7 @@ await mwb.setNavigationBarTheme({
 });
 ```
 
-再次设置会替换原回调；传入 `actionTxt: ""` 可移除按钮。`onActionClick` 不会序列化传给原生，原生点击时只回传 `actionExt`。目前 iOS、Android 均支持文字按钮，`actionIcon` 尚不支持。
+仅显式提供新 onActionClick 才替换原回调；局部颜色、显隐或 actionExt 更新保留 handler；传入 `actionTxt: ""` 可移除按钮。`onActionClick` 不会序列化传给原生，原生点击时只回传 `actionExt`。目前 iOS、Android 均支持文字按钮，`actionIcon` 尚不支持。
 
 网页也可直接引入发布包中的 `dist/mwb.iife.js`，通过 `window.mwb` 调用。应在 MWB 原生容器内加载；普通浏览器中的原生调用会给出“桥未就绪”错误。
 
@@ -169,3 +169,5 @@ if (await sdk.hasPlugin("network")) {
 MWB 的通信底层基于 [DSBridge](https://github.com/wendux/DSBridge-Android)（MIT）。接口能力参考当前工作区的旧项目，MWB 不依赖 Cordova。
 
 包内包含 LICENSE 和 THIRD_PARTY_NOTICES.md，ESM/IIFE/组合脚本保留完整许可注释；单独分发 bundle 时也不要移除这些注释。
+
+当前未发布源码支持三个导航方法共用外观参数和 MWBConfiguration.navigationBarAppearance 宿主默认主题，目标首帧前应用；已发布 0.1.5 不包含这些扩展。字段、合并、兼容和原生配置示例见[原生导航栏外观](../docs/navigation-bar.md)。

@@ -455,7 +455,7 @@ test('导航栏配置页将表单值应用到当前原生容器', async () => {
   try {
     dom.window.eval(readFileSync(join(project, 'dist', 'demo.js'), 'utf8'));
     assert.match(dom.window.document.querySelector('#app')?.textContent ?? '', /导航栏样式/);
-    assert.equal(dom.window.document.querySelector('[name="showBackButton"]'), null);
+    assert.ok(dom.window.document.querySelector('[name="showBackButton"]'));
     const title = dom.window.document.querySelector('[name="title"]');
     title.value = '预览标题';
     title.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
@@ -468,6 +468,42 @@ test('导航栏配置页将表单值应用到当前原生容器', async () => {
     assert.equal(applied?.color, '12374a');
   } finally {
     dom.window.close();
+  }
+});
+
+test('导航栏打开和替换入口直接携带外观，目标无需补设主题', async () => {
+  execFileSync(process.execPath, ['scripts/build.mjs'], { cwd: project, stdio: 'pipe' });
+  for (const osType of [1, 2]) {
+    const dom = new JSDOM('<div id="app"></div>', { url: 'file:///android_asset/navigation-theme.html', runScripts: 'outside-only' });
+    const calls = [];
+    dom.window._dsbridge = {};
+    dom.window.mwb = {
+      getDeviceInfoSync: () => ({ osType }),
+      navigateTo: async value => { calls.push(['navigateTo', value]); },
+      redirectTo: async value => { calls.push(['redirectTo', value]); }
+    };
+    try {
+      dom.window.eval(readFileSync(join(project, 'dist', 'demo.js'), 'utf8'));
+      await new Promise(resolve => setImmediate(resolve));
+      for (const name of ['buttonColor', 'backButtonStyle', 'backButtonText', 'separatorVisible', 'separatorColor', 'titleFontSize', 'titleFontWeight', 'buttonFontSize']) {
+        assert.ok(dom.window.document.querySelector(`[name="${name}"]`), `${name} 应有配置入口`);
+      }
+      for (const selector of ['.theme-open-page', '.theme-replace-page']) {
+        dom.window.document.querySelector(selector).click();
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      assert.deepEqual(calls.map(call => call[0]), ['navigateTo', 'redirectTo']);
+      for (const [, params] of calls) {
+        assert.equal(params.buttonColor, '049f91');
+        assert.equal(params.backButtonStyle, 'arrowText');
+        assert.equal(params.titleFontSize, 17);
+        assert.equal(params.showBackButton, true);
+        assert.equal('actionTxt' in params, false);
+        assert.equal('onActionClick' in params, false);
+        assert.equal('isBright' in params, false);
+        assert.equal('waitForReady' in params, osType === 2);
+      }
+    } finally { dom.window.close(); }
   }
 });
 

@@ -48,14 +48,17 @@ extension MWBBridgeAdapter {
             return
         }
         // 未实现的旧项目参数继续明确拒绝。
-        let supported = replacingCurrent ? ["url", "title", "hidden", "waitForReady"] :
-            ["url", "title", "hidden", "isPopUp", "waitForReady"]
+        let supported = Set(replacingCurrent ? ["url", "title", "hidden", "waitForReady"] :
+            ["url", "title", "hidden", "isPopUp", "waitForReady"]).union(MWBNavigationBarPatch.keys)
         let unsupported = params.keys.filter { !supported.contains($0) }
         guard unsupported.isEmpty else {
             let method = replacingCurrent ? "redirectTo" : "navigateTo"
             respond(.failure(-1004, "Unsupported \(method) options: \(unsupported.joined(separator: ", "))"), with: handler)
             return
         }
+        let appearance: MWBNavigationBarPatch
+        do { appearance = try .parse(params, strict: true) }
+        catch { respond(.failure(-1001, "Invalid navigation appearance"), with: handler); return }
         // 新接口严格校验基础字段，不改变旧 navigateTo 对历史参数的处理方式。
         if replacingCurrent {
             if let title = params["title"], !(title is String) {
@@ -82,6 +85,11 @@ extension MWBBridgeAdapter {
                 self.respond(.failure(-1004, "Navigation preparation is already pending"), with: handler)
                 return
             }
+            if appearance.enablesIsolation, controller.navigationController == nil,
+               params["isPopUp"] as? Bool != true {
+                self.respond(.failure(-1004, "Navigation appearance requires a navigation controller"), with: handler)
+                return
+            }
             // 没有导航栈时不能降级为 present，否则旧页面仍留在返回路径中。
             if replacingCurrent {
                 guard let navigation = controller.navigationController,
@@ -95,6 +103,7 @@ extension MWBBridgeAdapter {
             next.initialPageOverride = url
             next.initialNavigationBarHidden = params["hidden"] as? Bool ?? true
             next.title = params["title"] as? String
+            next.configureInitialNavigationBar(appearance)
             let show: (MWBWebViewController) -> Void = { [weak controller] next in
                 guard let controller else { return }
                 if replacingCurrent {
@@ -178,43 +187,28 @@ extension MWBBridgeAdapter {
         guard !rejectUntrusted(handler) else { return }
         let params = arg as? [String: Any] ?? [:]
         // 未实现的主题字段明确报错，避免网页误以为按钮或状态栏已更新。
-        let unsupported = ["showBackButton", "showCloseButton", "isBright",
+        let unsupported = ["showCloseButton", "isBright",
                            "actionIcon", "translucentStatusBars"]
         guard !unsupported.contains(where: { params[$0] != nil }) else {
             respond(.failure(-1004, "Unsupported navigation theme"), with: handler)
             return
         }
+        let patch: MWBNavigationBarPatch
+        do { patch = try .parse(params) }
+        catch { respond(.failure(-1001, "Invalid navigation appearance"), with: handler); return }
+        let sourceRevision = controller?.documentRevision
         DispatchQueue.main.async { [weak self] in
             guard let self, let controller = self.controller else { return }
-            if let title = params["title"] as? String { controller.title = title }
-            if let hidden = params["hidden"] as? Bool {
-                controller.navigationController?.setNavigationBarHidden(hidden, animated: false)
+            guard controller.documentRevision == sourceRevision else {
+                self.respond(.failure(-1005, "Source document is no longer active"), with: handler)
+                return
             }
+            if let title = params["title"] as? String { controller.title = title }
+            controller.applyNavigationBarPatch(patch, hidden: params["hidden"] as? Bool)
             if params["actionTxt"] != nil || params["actionExt"] != nil {
                 let title = params["actionTxt"] as? String ?? controller.navigationItem.rightBarButtonItem?.title
-                controller.configureNavigationAction(title: title, ext: params["actionExt"] as? String)
+                controller.configureNavigationAction(title: title, ext: params["actionExt"] as? String ?? controller.currentNavigationActionExt)
             }
-            let background = (params["color"] as? String).flatMap(UIColor.init(mwbHex:))
-            let titleColor = (params["titleColor"] as? String).flatMap(UIColor.init(mwbHex:))
-            if let bar = controller.navigationController?.navigationBar,
-               background != nil || titleColor != nil {
-                let appearance = bar.standardAppearance.copy()
-                if let background {
-                    let previousTitleStyle = appearance.titleTextAttributes
-                    appearance.configureWithOpaqueBackground()
-                    appearance.backgroundColor = background
-                    appearance.titleTextAttributes = previousTitleStyle
-                    bar.backgroundColor = background
-                }
-                if let titleColor {
-                    appearance.titleTextAttributes[.foregroundColor] = titleColor
-                    bar.titleTextAttributes = [.foregroundColor: titleColor]
-                    bar.tintColor = titleColor
-                }
-                bar.standardAppearance = appearance
-                bar.scrollEdgeAppearance = appearance.copy()
-            }
-            controller.rememberNavigationBarState()
             self.respond(.success(), with: handler)
         }
     }
@@ -226,15 +220,5 @@ extension MWBBridgeAdapter {
                              modifiedSince: .distantPast) { [weak self] in
             self?.respond(.success(), with: handler)
         }
-    }
-}
-
-private extension UIColor {
-    convenience init?(mwbHex: String) {
-        let value = mwbHex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard value.count == 6, let number = Int(value, radix: 16) else { return nil }
-        self.init(red: CGFloat((number >> 16) & 0xff) / 255,
-                  green: CGFloat((number >> 8) & 0xff) / 255,
-                  blue: CGFloat(number & 0xff) / 255, alpha: 1)
     }
 }

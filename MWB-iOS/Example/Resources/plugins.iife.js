@@ -409,16 +409,24 @@ SOFTWARE.
     const nativeSetTheme = methods.setNavigationBarTheme;
     if (nativeSetTheme) {
       let currentActionClick;
+      let themeQueue = Promise.resolve();
       methods.setNavigationBarTheme = async (param) => {
         const { onActionClick, ...nativeParam } = param;
-        const result = await nativeSetTheme(nativeParam);
-        if (currentActionClick) events.unRegisterHandler("navigationActionClick", currentActionClick);
-        currentActionClick = void 0;
-        if (nativeParam.actionTxt?.trim() && onActionClick) {
-          events.registerHandler("navigationActionClick", onActionClick);
-          currentActionClick = onActionClick;
+        if (onActionClick !== void 0 && typeof onActionClick !== "function") {
+          throw new TypeError("onActionClick must be a function");
         }
-        return result;
+        const request = themeQueue.then(async () => {
+          const result = await nativeSetTheme(nativeParam);
+          const clearsAction = typeof nativeParam.actionTxt === "string" && !nativeParam.actionTxt.trim();
+          if (clearsAction || onActionClick !== void 0) {
+            if (currentActionClick) events.unRegisterHandler("navigationActionClick", currentActionClick);
+            currentActionClick = clearsAction ? void 0 : onActionClick;
+            if (currentActionClick) events.registerHandler("navigationActionClick", currentActionClick);
+          }
+          return result;
+        });
+        themeQueue = request.catch(() => void 0);
+        return request;
       };
     }
     const basic = Object.freeze({ ...methods, ...events });

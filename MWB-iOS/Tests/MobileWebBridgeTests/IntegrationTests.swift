@@ -106,13 +106,14 @@ final class IntegrationTests: XCTestCase {
         let controller = MWBWebViewController(configuration: .init(initialURL: url, allowedOrigins: []))
         controller.loadViewIfNeeded()
         let navigation = UINavigationController(rootViewController: controller)
-        let window = UIWindow(frame: UIScreen.main.bounds)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
         window.rootViewController = navigation
         window.makeKeyAndVisible()
         defer { window.isHidden = true }
 
         let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            controller.loadState == .loaded
+            controller.loadState == .loaded && controller.view.window != nil && navigation.transitionCoordinator == nil
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
 
@@ -142,6 +143,27 @@ final class IntegrationTests: XCTestCase {
         }
         checkClick()
         wait(for: [clicked], timeout: 5)
+
+        // 捕获旧文档事件脚本，整页重载后执行，不能命中新文档注册的回调。
+        let oldDocument = try XCTUnwrap(controller.pluginSession.identity)
+        let staleScript = MWBPluginJavaScript.navigationAction(document: oldDocument, payload: ["actionExt": "stale"])
+        controller.reload()
+        let reloaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            controller.loadState == .loaded && controller.pluginSession.identity != oldDocument
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [reloaded], timeout: 10), .completed)
+        let discarded = expectation(description: "stale action is discarded at execution")
+        controller.webView?.evaluateJavaScript("""
+            window.__mwbStaleCount=0;
+            dsBridge.register('mwb.navigationActionClick',()=>{window.__mwbStaleCount++});
+            \(staleScript)
+            window.__mwbStaleCount;
+            """) { value, error in
+            XCTAssertNil(error)
+            XCTAssertEqual(value as? Int, 0)
+            discarded.fulfill()
+        }
+        wait(for: [discarded], timeout: 5)
     }
 }
 

@@ -8,17 +8,20 @@ public struct MWBConfiguration {
     /// 默认在页面稳定显示后预热一个备用 WebView；可按宿主内存预算关闭。
     public let webViewPrewarmingEnabled: Bool
     public let errorPage: MWBErrorPageConfiguration
+    /// 新容器首帧采用的外观；nil 保留旧导航栏继承行为。
+    public let navigationBarAppearance: MWBNavigationBarAppearance?
 
-    public init(initialURL: URL, allowedOrigins: Set<String> = ["*"], errorPage: MWBErrorPageConfiguration = .init(), webViewPrewarmingEnabled: Bool = true) {
+    public init(initialURL: URL, allowedOrigins: Set<String> = ["*"], errorPage: MWBErrorPageConfiguration = .init(), webViewPrewarmingEnabled: Bool = true, navigationBarAppearance: MWBNavigationBarAppearance? = nil) {
         self.initialURL = initialURL
         self.allowedOrigins = allowedOrigins
         self.errorPage = errorPage
         self.webViewPrewarmingEnabled = webViewPrewarmingEnabled
+        self.navigationBarAppearance = navigationBarAppearance
     }
 
     /// 从字符串建立配置，避免把空地址交给 WebView。
-    public static func make(initialURLString: String, allowedOrigins: Set<String> = ["*"], errorPage: MWBErrorPageConfiguration = .init(), webViewPrewarmingEnabled: Bool = true) -> Self? {
+    public static func make(initialURLString: String, allowedOrigins: Set<String> = ["*"], errorPage: MWBErrorPageConfiguration = .init(), webViewPrewarmingEnabled: Bool = true, navigationBarAppearance: MWBNavigationBarAppearance? = nil) -> Self? {
         guard let url = URL(string: initialURLString), url.scheme != nil else { return nil }
-        return Self(initialURL: url, allowedOrigins: allowedOrigins, errorPage: errorPage, webViewPrewarmingEnabled: webViewPrewarmingEnabled)
+        return Self(initialURL: url, allowedOrigins: allowedOrigins, errorPage: errorPage, webViewPrewarmingEnabled: webViewPrewarmingEnabled, navigationBarAppearance: navigationBarAppearance)
     }
 }

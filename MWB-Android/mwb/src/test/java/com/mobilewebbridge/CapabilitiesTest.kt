@@ -22,6 +22,135 @@ import wendu.dsbridge.CompletionHandler
 /** 分组隔离和不可信页面拒绝是原生能力的关键边界。 */
 @RunWith(RobolectricTestRunner::class)
 class CapabilitiesTest {
+    @Test fun navigateAppearanceOverridesHostPerFieldBeforeFirstPageLoad() {
+        // 打开只覆盖标题色时，宿主的独立按钮色仍保留，且不需要目标 JS。
+        val config = MWBConfiguration("file:///android_asset/index.html", emptySet(),
+            navigationBarAppearance = MWBNavigationBarAppearance(
+                titleColor = android.graphics.Color.BLACK, buttonColor = android.graphics.Color.GREEN,
+                backButtonStyle = MWBBackButtonStyle.TEXT, titleFontSize = 18f))
+        val source = Robolectric.buildActivity(MWBActivity::class.java,
+            MWBActivity.createIntent(ApplicationProvider.getApplicationContext(), config)).setup().get()
+        NavigationApi(source).navigateTo(JSONObject().put("url", config.initialUrl).put("hidden", false)
+            .put("title", "打开覆盖").put("titleColor", "ffffff"), object : CompletionHandler<Any> {
+            override fun complete(retValue: Any) { assertEquals(0, (retValue as JSONObject).getInt("errCode")) }
+            override fun complete() = Unit
+            override fun setProgressData(value: Any) = Unit
+        })
+        val target = Robolectric.buildActivity(MWBActivity::class.java,
+            org.robolectric.Shadows.shadowOf(source).nextStartedActivity).setup().get()
+        val views = descendants(target.navigationBar!!)
+        val title = views.filterIsInstance<TextView>().single { it.text == "打开覆盖" }
+        val back = views.filterIsInstance<Button>().single { it.text == "返回" }
+        assertEquals(android.graphics.Color.WHITE, title.currentTextColor)
+        assertEquals(android.graphics.Color.GREEN, back.currentTextColor)
+        assertEquals(View.VISIBLE, back.visibility)
+        assertEquals(View.VISIBLE, target.navigationBar!!.visibility)
+    }
+
+    @Test fun actionIsRemovedOnDocumentInvalidationAndExtDoesNotLeak() {
+        val activity = activity()
+        val view = activity.webView!!
+        val client = org.robolectric.Shadows.shadowOf(view).webViewClient
+        client.onPageStarted(view, "file:///android_asset/index.html", null)
+        assertTrue(activity.applyNavigationTheme(JSONObject().put("actionTxt", "保存").put("actionExt", "old")))
+        val oldDocument = activity.pluginSession.replyDocumentId()
+        activity.reload()
+        val action = descendants(activity.navigationBar!!).filterIsInstance<Button>().single { it.text.isEmpty() && it.visibility == View.GONE }
+        assertEquals(View.GONE, action.visibility)
+        client.onPageStarted(view, "file:///android_asset/index.html", null)
+        assertNotEquals(oldDocument, activity.pluginSession.replyDocumentId())
+        assertTrue(activity.applyNavigationTheme(JSONObject().put("actionTxt", "新操作")))
+        action.performClick()
+        val queue = wendu.dsbridge.DWebView::class.java.getDeclaredField("callInfoList").apply { isAccessible = true }.get(view) as List<*>
+        val call = queue.last()!!
+        val data = call.javaClass.getDeclaredField("data").apply { isAccessible = true }.get(call)
+        assertFalse(data.toString().contains("old"))
+    }
+
+    @Test fun longBackTextAndActionDoNotOverlapOnNarrowScreen() {
+        val activity = activity()
+        assertTrue(activity.applyNavigationTheme(JSONObject().put("backButtonStyle", "arrowText")
+            .put("backButtonText", "返回上一个非常长的页面名称").put("buttonFontSize", 28)
+            .put("actionTxt", "保存").put("showCloseButton", true)))
+        val bar = activity.navigationBar!!
+        bar.layoutDirection = View.LAYOUT_DIRECTION_LTR
+        val scale = activity.resources.displayMetrics.density
+        val width = (320 * scale).toInt()
+        // Robolectric 的 CJK 字体测量偏小，用原生最小宽度模拟实际长文本的固有宽度。
+        descendants(bar).filterIsInstance<Button>().single { it.text.startsWith("返回上一个") }.minimumWidth = width
+        bar.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        bar.layout(0, 0, width, bar.measuredHeight)
+        val back = descendants(bar).filterIsInstance<Button>().single { it.text.startsWith("返回上一个") }
+        val action = descendants(bar).filterIsInstance<Button>().single { it.text == "关闭" }
+        val backRect = android.graphics.Rect(); val actionRect = android.graphics.Rect()
+        back.getDrawingRect(backRect); action.getDrawingRect(actionRect)
+        (bar as ViewGroup).offsetDescendantRectToMyCoords(back, backRect)
+        bar.offsetDescendantRectToMyCoords(action, actionRect)
+        assertTrue("返回控件必须实际布局: $backRect", backRect.width() > 0 && backRect.height() > 0)
+        assertTrue("关闭控件必须实际布局: $actionRect", actionRect.width() > 0 && actionRect.height() > 0)
+        assertTrue("返回 $backRect 与关闭 $actionRect 不可交叠", backRect.right <= actionRect.left)
+        assertTrue("长返回须为另一侧按钮预留宽度", back.width <= width / 2)
+    }
+
+    @Test fun explicitArrowAndTextArrowUseRtlAndNativeTouchTargets() {
+        val activity = activity()
+        val bar = activity.navigationBar!!
+        bar.layoutDirection = View.LAYOUT_DIRECTION_RTL
+        assertTrue(activity.applyNavigationTheme(JSONObject().put("backButtonStyle", "arrow")))
+        val arrow = descendants(bar).filterIsInstance<ImageButton>().single()
+        assertTrue(arrow.drawable.isAutoMirrored)
+        assertTrue(activity.applyNavigationTheme(JSONObject().put("backButtonStyle", "arrowText")
+            .put("backButtonText", "返回上一页").put("buttonFontSize", 28).put("titleFontSize", 32)))
+        val back = descendants(bar).filterIsInstance<Button>().single { it.text == "返回上一页" }
+        assertTrue(back.compoundDrawablesRelative[0].isAutoMirrored)
+        assertEquals(View.VISIBLE, back.visibility)
+        val width = (360 * activity.resources.displayMetrics.density).toInt()
+        bar.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        bar.layout(0, 0, width, bar.measuredHeight)
+        assertTrue(back.width >= 48 * activity.resources.displayMetrics.density)
+        assertTrue(back.height >= 48 * activity.resources.displayMetrics.density)
+    }
+
+    @Test fun independentButtonColorSurvivesTitleAndNewAction() {
+        // 标题改变和添加按钮不能重置显式按钮色。
+        val activity = activity()
+        assertTrue(activity.applyNavigationTheme(JSONObject().put("titleColor", "0b4148").put("buttonColor", "049f91")))
+        assertTrue(activity.applyNavigationTheme(JSONObject().put("titleColor", "ffffff").put("actionTxt", "保存")))
+        val action = descendants(activity.navigationBar!!).filterIsInstance<Button>().single { it.text == "保存" }
+        assertEquals(android.graphics.Color.rgb(4, 159, 145), action.currentTextColor)
+        val back = descendants(activity.navigationBar!!).filterIsInstance<ImageButton>().single()
+        assertEquals(android.graphics.Color.rgb(4, 159, 145), back.imageTintList!!.defaultColor)
+    }
+
+    @Test fun invalidAppearanceIsAtomicAndDoesNotLaunchReplacement() {
+        val activity = activity()
+        activity.title = "原页"
+        assertFalse(activity.applyNavigationTheme(JSONObject().put("title", "错误").put("buttonColor", "bad")))
+        assertEquals("原页", activity.title)
+        assertEquals(-1001, redirect(activity, JSONObject().put("url", "file:///android_asset/index.html").put("titleFontSize", 100)))
+        assertNull(org.robolectric.Shadows.shadowOf(activity).nextStartedActivity)
+        assertFalse(activity.isFinishing)
+    }
+
+    @Test fun redirectCarriesInitialAppearanceAndDoesNotRequireTargetJavaScript() {
+        // 目标创建完即可读到外观，不调用 setNavigationBarTheme 补设。
+        val source = activity()
+        assertEquals(0, redirect(source, JSONObject().put("url", "file:///android_asset/index.html")
+            .put("hidden", false).put("title", "初始外观").put("titleColor", "0b4148").put("buttonColor", "049f91")
+            .put("backButtonStyle", "arrowText").put("backButtonText", "返回").put("showBackButton", false)
+            .put("separatorVisible", true).put("separatorColor", "dfe8e5").put("titleFontSize", 17)
+            .put("titleFontWeight", "semibold").put("buttonFontSize", 16)))
+        val target = Robolectric.buildActivity(MWBActivity::class.java,
+            org.robolectric.Shadows.shadowOf(source).nextStartedActivity).setup().get()
+        val title = descendants(target.navigationBar!!).filterIsInstance<TextView>().single { it.text == "初始外观" }
+        assertEquals(android.graphics.Color.rgb(11, 65, 72), title.currentTextColor)
+        assertEquals(17f * target.resources.displayMetrics.scaledDensity, title.textSize, 0.01f)
+        val back = descendants(target.navigationBar!!).filterIsInstance<ImageButton>().single()
+        assertEquals(View.GONE, back.visibility)
+    }
+
     private fun descendants(view: View): List<View> = listOf(view) +
         if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
 
@@ -319,6 +448,9 @@ class CapabilitiesTest {
         val data = call.javaClass.getDeclaredField("data").apply { isAccessible = true }.get(call)
         assertEquals("mwb.navigationActionClick", method)
         assertTrue(data.toString().contains("draft-42"))
+        // 点击和 JavaScript 真正执行之间也可能整页导航，待分发脚本必须绑定文档。
+        assertEquals(true, call.javaClass.getDeclaredField("documentBound").apply { isAccessible = true }.get(call))
+        assertEquals(activity.pluginSession.replyDocumentId(), call.javaClass.getDeclaredField("documentId").apply { isAccessible = true }.get(call))
 
         assertTrue(activity.applyNavigationTheme(JSONObject().put("actionTxt", "")))
         assertEquals(android.view.View.GONE, action.visibility)

@@ -371,9 +371,11 @@ Demo 包括 49 方法目录与调试详情、导航栏样式配置页、原生�
 
 - `allowedOrigins` 默认是 iOS 的 `["*"]` / Android 的 `setOf("*")`，省略该参数即可允许所有 HTTP/HTTPS 来源加载并使用原生桥，两端 Demo 同样使用此默认值。需要限制时显式传入完整来源，例如 `https://app.example.com`，不包含路径。仅完整星号有效，不支持子域名通配符；显式空集合仅允许内置本地页面。星号不放宽本地文件、其他协议或系统网络限制。业务插件的网络目标域名策略由宿主另行配置。
 - Android 沿用 DSBridge 的 JavascriptInterface，桥会进入所有 frame，宿主页面不得嵌入不可信 frame。插件 documentId 用于文档生命周期隔离，不能作为防 XSS 的凭证。
-- 当前源码新增 `redirectTo`，将 `P → A` 替换为 `P → B`，B 返回 P；两端支持立即替换，iOS 另支持可选 `waitForReady`。已发布 `0.1.5` 制品不包含此方法，需配套更新 JS 与原生源码，详见[页面打开与替换](docs/navigation.md)。
+- `redirectTo` 自 `0.1.5` 提供，将 `P → A` 替换为 `P → B`，B 返回 P；详见[页面打开与替换](docs/navigation.md)。
 - 容器默认禁用双指缩放和正文长按菜单；`navigateTo` 新容器默认隐藏导航栏，需要显示时传 `hidden: false`。导航栏支持右上角文字按钮及 JS 点击回调。
 - 相机、相册、扫码等仍受系统权限和设备能力限制；Android 扫码依赖 Google Play 服务，iOS 的 `exitApp()` 返回不支持。具体差异以兼容表为准。
+
+当前未发布源码新增导航栏独立按钮色、返回展示、分隔与字体，以及打开/替换时首帧外观配置。已发布 0.1.5 不含这些扩展，详见[原生导航栏外观](docs/navigation-bar.md)。
 
 ## 更多文档
 

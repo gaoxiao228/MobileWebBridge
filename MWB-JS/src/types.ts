@@ -42,8 +42,29 @@ export type ParamStorageClear = {
 };
 
 
+/** 三个导航方法共享的可选原生外观；打开时在目标容器首帧前应用。 */
+export type NavigationBarAppearanceOptions = {
+	/** 6 位十六进制背景色，可带 #。 */
+	color?: string;
+	/** 未显式设置 buttonColor 时，沿用标题和按钮同色的旧行为。 */
+	titleColor?: string;
+	/** 显式指定后，后续 titleColor 更新不再影响按钮。 */
+	buttonColor?: string;
+	backButtonStyle?: "text" | "arrow" | "arrowText";
+	/** 默认“返回”；不能是空白字符串。 */
+	backButtonText?: string;
+	showBackButton?: boolean;
+	separatorVisible?: boolean;
+	separatorColor?: string;
+	/** 系统缩放前字号，0 < size <= 32；iOS 缩放后上限 32pt。 */
+	titleFontSize?: number;
+	titleFontWeight?: "regular" | "medium" | "semibold" | "bold";
+	/** 系统缩放前字号，0 < size <= 28；iOS 缩放后上限 28pt。 */
+	buttonFontSize?: number;
+};
+
 /** 替换当前原生容器；Android 必须省略 waitForReady，不支持创建新弹窗。 */
-export type ParamRedirectTo = {
+export type ParamRedirectTo = NavigationBarAppearanceOptions & {
 	/** 目标地址，沿用容器的可信来源限制。 */
 	url: string;
 	/** 新容器标题。 */
@@ -54,118 +75,49 @@ export type ParamRedirectTo = {
 	waitForReady?: boolean;
 };
 
-export type ParamNavigateTo = {
-	/** 仅 iOS：SDK 等待主文档加载与绘制准备后转场，默认 false；最长等待 3000ms，不代表业务数据就绪。 */
-	waitForReady?: boolean;
-	/**
-	* 跳转地址
-	**/
+export type ParamNavigateTo = NavigationBarAppearanceOptions & {
 	url: string;
-	/**
-	* 是否隐藏导航栏，默认 true
-	**/
+	/** 默认 true；样式参数不会自动显示导航栏。 */
 	hidden?: boolean;
-	/**
-	* 导航栏标题
-	**/
 	title?: string;
-	/**
-	*  标题文字颜色，如 eeeeee
-	**/
-	titleColor?: string;
-	/**
-	* 导航栏颜色 如 eeeeee
-	**/
-	color?: string;
-	/**
-	* 是否是亮色主题 控制状态栏
-	**/
-	isBright?: boolean;
-	/**
-	* 是否显示返回按钮
-	**/
-	showBackButton?: boolean;
-	/**
-	* 是否显示关闭按钮
-	**/
-	showCloseButton?: boolean;
-	/**
-	* 右上角文字按钮
-	**/
-	actionTxt?: string;
-	/**
-	* 右上角 icon base64
-	**/
-	actionIcon?: string;
-	/**
-	* 右上角 传参 点击的时候会回传给H5
-	**/
-	actionExt?: string;
-	/**
-	* 状态栏是否沉浸
-	**/
-	translucentStatusBars?: boolean;
-	/**
-	* 打开新页面样式是否弹出
-	**/
+	/** 仅 iOS，默认 false；Android 必须省略。 */
+	waitForReady?: boolean;
+	/** 仅 iOS：打开新的原生导航弹窗。 */
 	isPopUp?: boolean;
-	/**
-	* 打开的新页面回调给当前页面的回调函数
-	**/
+	/** @deprecated 打开方法不支持；由 Android 目标文档通过主题方法设置。 */
+	isBright?: boolean;
+	/** @deprecated 打开方法不支持；由 Android 目标文档通过主题方法设置。 */
+	showCloseButton?: boolean;
+	/** @deprecated 操作与回调由目标文档注册，不能从来源页传入。 */
+	actionTxt?: string;
+	/** @deprecated 原生尚不支持图片按钮。 */
+	actionIcon?: string;
+	/** @deprecated 操作载荷由目标文档设置。 */
+	actionExt?: string;
+	/** @deprecated 原生不支持沉浸状态栏参数。 */
+	translucentStatusBars?: boolean;
+	/** @deprecated 原生不支持此回调参数；使用已有返回事件。 */
 	callbackFunction?: GenericCallbackFunc | string;
-
 };
 
 export type ParamExternalBrowse = {
 	url: string;
 };
 
-export type ParamNavigationBarTheme = {
-	/**
-	* 是否隐藏导航栏
-	**/
+export type ParamNavigationBarTheme = NavigationBarAppearanceOptions & {
 	hidden?: boolean;
-	/**
-	* 导航栏标题
-	**/
 	title?: string;
-	/**
-	*  标题文字颜色，如 eeeeee
-	**/
-	titleColor?: string;
-	/**
-	* 导航栏颜色 如 eeeeee
-	**/
-	color?: string;
-	/**
-	* 是否是亮色主题 控制状态栏
-	**/
+	/** 仅 Android：状态栏明暗。 */
 	isBright?: boolean;
-	/**
-	* 是否显示返回按钮
-	**/
-	showBackButton?: boolean;
-	/**
-	* 是否显示关闭按钮
-	**/
+	/** 仅 Android：显示关闭按钮。 */
 	showCloseButton?: boolean;
-	/**
-	* 右上角文字按钮
-	**/
 	actionTxt?: string;
-	/**
-	* 右上角 icon base64
-	**/
+	/** 原生尚不支持，传入会拒绝。 */
 	actionIcon?: string;
-	/**
-	* 右上角 传参 点击的时候会回传给H5
-	**/
 	actionExt?: string;
-	/** 当前页面右上角文字按钮被点击时执行；函数只由 JS SDK 保存。 */
+	/** 函数仅留在当前文档；局部外观更新保留现有 handler。 */
 	onActionClick?: (data: { actionExt?: string }) => void;
-	/**
-	* 状态栏是否沉浸
-	**/
+	/** 原生尚不支持，传入会拒绝。 */
 	translucentStatusBars?: boolean;
 };
 

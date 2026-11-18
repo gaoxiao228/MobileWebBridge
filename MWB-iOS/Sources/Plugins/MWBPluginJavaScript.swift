@@ -15,6 +15,18 @@ enum MWBPluginJavaScript {
         })();
         """
     }
+    /// 导航操作不排队到其他文档；在 WebKit 实际执行时再次核对不可变身份。
+    static func navigationAction(document: String, payload: [String: Any]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [document, payload]),
+              let json = String(data: data, encoding: .utf8) else { return "" }
+        return """
+        (()=>{const [doc,payload]=\(json);
+          if(window.__mwbNativePluginDocumentId!==doc)return;
+          const callback=window._dsf&&window._dsf['mwb.navigationActionClick'];
+          if(typeof callback==='function')callback(payload);
+        })();
+        """
+    }
     static func event(_ message: [String: Any]) -> String {
         guard let data = try? JSONSerialization.data(withJSONObject: message),
               let json = String(data: data, encoding: .utf8) else { return "" }
