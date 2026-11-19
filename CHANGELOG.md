@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.1.8 — 2026-11-19
+
+- iOS 和 Android 使用统一的原生扫码页：全屏取景、框外遮罩、青绿色扫描线及底部相册入口；保留系统减少动态效果设置。
+- Android 用 CameraX 和随包分发的 ML Kit 模型替代 Google Code Scanner，不需设备安装 Google Play 服务或首次联网下载模型。
+- `scanCode` 两端均可按 `scanType` 筛选相机和相册结果；传入 `hideAlbum: false` 在两端显示相册入口，省略时保留既有平台默认值。
+- JS、iOS、Android 与 Demo 同步为 `0.1.8`，Demo 构建号 8；分发状态见[版本说明](docs/versioning.md)。
+
 ## 0.1.7 — 2026-11-19
 
 - 修复 iOS 侧滑返回无导航栏页面时，深色导航栏在手势刚开始就消失的问题。导航栏随手势进度淡出，取消时恢复，返回完成后才隐藏。

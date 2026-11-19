@@ -2,7 +2,7 @@
 
 当前源码的 iOS/Android 容器均新增默认本地 HTML 错误页、自定义模板、重试、`onGoHome` 与宿主 `configureContainer`；旧 Pod `0.1.0` 和 Maven `0.1.1` 不包含这些能力。错误页属于原生容器能力，不增加业务 JS 方法，详见 [错误页接入](error-pages.md)。
 
-此表以 JS、iOS 和 Android 的 `0.1.7` 源码及插件协议 1 为基准；制品状态、历史版本和环境边界见 [版本说明](versioning.md)。`0` 为成功；`-1001` 参数错误、`-1002` 操作失败、`-1003` 方法缺失、`-1004` 平台不支持、`-1005` 宿主能力未配置、`-1006` 页面不可信、`-1007` 用户取消、`-1008` 权限拒绝或操作忙。异步方法返回 `{errCode, result?, errorMsg?}`；失败的 JS Promise 会拒绝。
+此表以 JS、iOS 和 Android 的 `0.1.8` 源码及插件协议 1 为基准；制品状态、历史版本和环境边界见 [版本说明](versioning.md)。`0` 为成功；`-1001` 参数错误、`-1002` 操作失败、`-1003` 方法缺失、`-1004` 平台不支持、`-1005` 宿主能力未配置、`-1006` 页面不可信、`-1007` 用户取消、`-1008` 权限拒绝或操作忙。异步方法返回 `{errCode, result?, errorMsg?}`；失败的 JS Promise 会拒绝。
 
 | 方法 | iOS | Android | 备注 |
 | --- | --- | --- | --- |
@@ -27,7 +27,7 @@
 | `exitApp` | 不支持 | 原生 | iOS 返回 `-1004`；Android 默认仅关闭容器 |
 | `openNativePage` | 宿主 | 宿主 | 只使用宿主显式注册的页面 |
 | `compressImage` | 原生 | 原生 | Base64 输入输出 |
-| `scanCode` | 原生 | 原生 | Android 依赖 Google Play Code Scanner；不支持相册扫码，显式 `hideAlbum:false` 返回 `-1004` |
+| `scanCode` | 相机 / 相册 | 相机 / 相册 | 当前源码：Android 无需安装 Google Play 服务，`hideAlbum` 省略时 iOS 显示、Android 隐藏；两端共用取景与动效设计 |
 | `saveImageToPhotosAlbum` | 原生 | 原生 | 权限拒绝返回错误 |
 | `chooseImage` | 原生 | 原生 | Android `all` 弹出来源选择，`count` 最多 20；相机路径为缓存缩略图 |
 | `openFile` | 原生 | 原生 | Android 仅允许 HTTPS PDF 或 MWB 缓存路径 |
@@ -57,6 +57,13 @@
 | `offBackBtnPressed` | JS | JS | 解绑返回键处理 |
 
 上表 48 方法归为 basic，`mwb.basic.xxx` 和 `mwb.xxx` 是相同函数，继续走原同步/异步通道。`mwb.version` 为 SDK 元数据，不属于 basic 方法。默认入口未预装任何业务插件。
+
+## 扫码参数与结果
+
+- `scanType` 可省略（同时识别两类），或传入非空数组，元素只能是 `qrCode` 或 `barCode`；非法参数返回 `-1001`。成功返回 `result: { scanType, code }`，其中 `code` 为识别出的非空文本，不会自动执行或打开其内容。
+- 两端相机支持 QR、EAN-8、EAN-13、Code 39、Code 128。Android 还支持 Code 93、Codabar、ITF、UPC-A、UPC-E；iOS 相机另支持 PDF417，iOS 相册的其他格式取决于系统 Vision。
+- `hideAlbum: false` 显示相册按钮，`true` 隐藏。进入扫码需相机权限；iOS 宿主须提供 `NSCameraUsageDescription`，两端扫码选图均不要求全相册读取权限。`permissionPromptTitle` 和 `permissionPromptMessage` 保留为兼容参数，目前不自定义系统权限提示。
+- 取消系统选图会回到相机，不结束调用；关闭扫码页返回 `-1007`。照片不可读或解析异常返回 `-1002`；没有匹配的码或相机不可用返回 `-1004`；权限拒绝或已有扫码未结束时返回 `-1008`。
 
 ## 自定义原生插件 Core
 
@@ -88,7 +95,7 @@
 
 ## 加载状态与首屏就绪
 
-本能力已随配套的 `0.1.3` 提供，并由本轮 `0.1.7` 继续支持。当前 basic 源码共 50 个方法；新增的 `notifyPageReady()` 复用文档身份网关，其他既有 basic 原生方法仍使用各自入口。
+本能力已随配套的 `0.1.3` 提供，并由本轮 `0.1.8` 继续支持。当前 basic 源码共 50 个方法；新增的 `notifyPageReady()` 复用文档身份网关，其他既有 basic 原生方法仍使用各自入口。
 
 | 能力 | iOS | Android |
 | --- | --- | --- |

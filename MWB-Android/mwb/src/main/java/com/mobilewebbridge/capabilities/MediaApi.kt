@@ -11,9 +11,6 @@ import android.os.Build
 import android.provider.MediaStore
 import android.util.Base64
 import androidx.core.content.FileProvider
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
-import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
-import com.google.mlkit.vision.barcode.common.Barcode
 import com.mobilewebbridge.MWBActivity
 import com.mobilewebbridge.MWBResult
 import org.json.JSONArray
@@ -30,6 +27,9 @@ class MediaApi(private val activity: MWBActivity) {
     private var pendingCamera: Boolean = false
     private var pendingSave: Pair<Bitmap, CompletionHandler<Any>>? = null
     private var pendingImageCount = 1
+    private var pendingScan: Pair<Int, CompletionHandler<Any>>? = null
+    // 独立的请求号避免迟到的旧结果误结算当前扫码。
+    private var scanRequestCode = 0x5100
 
     /** Activity 销毁时丢弃旧页面回调，重建后的 WebView 不会继承它们。 */
     fun dispose() {
@@ -37,6 +37,9 @@ class MediaApi(private val activity: MWBActivity) {
         pendingPermission = null
         pendingSave = null
         pendingCamera = false
+        val scan = pendingScan
+        pendingScan = null
+        if (scan != null) activity.finishActivity(scan.first)
     }
 
     private val imageDir: File get() = File(activity.cacheDir, "mwb").apply { mkdirs() }
@@ -77,32 +80,20 @@ class MediaApi(private val activity: MWBActivity) {
     }
 
     fun scanCode(arg: Any, cb: CompletionHandler<Any>) {
-        val p = params(arg)
-        if (p?.has("hideAlbum") == true && !p.optBoolean("hideAlbum"))
-            return error(cb, -1004, "Album scanning is unavailable on Android")
-        val requested = p?.optJSONArray("scanType")
-        val types = if (requested == null) setOf("qrCode", "barCode")
-            else (0 until requested.length()).map(requested::optString).toSet()
-        if (types.isEmpty() || types.any { it !in setOf("qrCode", "barCode") })
-            return error(cb, -1001, "Invalid scan type")
-        val oneDimensional = intArrayOf(Barcode.FORMAT_CODE_128, Barcode.FORMAT_CODE_39,
-            Barcode.FORMAT_CODE_93, Barcode.FORMAT_CODABAR, Barcode.FORMAT_EAN_13,
-            Barcode.FORMAT_EAN_8, Barcode.FORMAT_ITF, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E)
-        val formats = when (types) {
-            setOf("qrCode") -> intArrayOf(Barcode.FORMAT_QR_CODE)
-            setOf("barCode") -> oneDimensional
-            else -> intArrayOf(Barcode.FORMAT_QR_CODE, *oneDimensional)
-        }
-        val options = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(formats[0], *formats.drop(1).toIntArray()).build()
+        val options = MWBScanOptions.parse(params(arg)) ?: return error(cb, -1001, "Invalid scan type")
         activity.runOnUiThread {
-            // Google Code Scanner 自行持有相机权限；无 Play Services 时明确返回失败。
-            GmsBarcodeScanning.getClient(activity, options).startScan()
-                .addOnSuccessListener { barcode ->
-                    val type = if (barcode.format == Barcode.FORMAT_QR_CODE) "qrCode" else "barCode"
-                    result(cb, JSONObject().put("scanType", type).put("code", barcode.rawValue ?: ""))
-                }
-                .addOnCanceledListener { error(cb, -1007, "Cancelled") }
-                .addOnFailureListener { error(cb, -1004, "Scanner unavailable") }
+            if (pendingScan != null) return@runOnUiThread error(cb, -1008, "Scanner is busy")
+            if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread error(cb, -1004, "Scanner is unavailable")
+            val request = scanRequestCode
+            scanRequestCode = if (request == 0x7fff) 0x5100 else request + 1
+            pendingScan = request to cb
+            try {
+                @Suppress("DEPRECATION") // 宿主公开容器沿用现有 Activity 结果转发。
+                activity.startActivityForResult(MWBScannerActivity.createIntent(activity, options), request)
+            } catch (_: RuntimeException) {
+                pendingScan = null
+                error(cb, -1004, "Scanner is unavailable")
+            }
         }
     }
 
@@ -206,6 +197,17 @@ class MediaApi(private val activity: MWBActivity) {
     }
 
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        pendingScan?.takeIf { it.first == requestCode }?.let { (_, cb) ->
+            // 在回调前释放占用，允许调用方立即重新扫码。
+            pendingScan = null
+            val failure = data?.getIntExtra("errCode", 0) ?: 0
+            if (failure != 0) return error(cb, failure, data?.getStringExtra("errorMsg") ?: "Scan failed")
+            if (resultCode != Activity.RESULT_OK) return error(cb, -1007, "Cancelled")
+            val type = data?.getStringExtra("scanType")
+            val code = data?.getStringExtra("code")
+            if (type == null || code.isNullOrEmpty()) return error(cb, -1002, "Invalid scan result")
+            return result(cb, JSONObject().put("scanType", type).put("code", code))
+        }
         if (requestCode != PICK && requestCode != CAMERA) return
         val cb = pendingImage ?: return
         pendingImage = null

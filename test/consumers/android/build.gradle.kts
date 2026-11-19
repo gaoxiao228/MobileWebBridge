@@ -16,7 +16,7 @@ android {
 
 dependencies {
     // 此处不得替换为 project(:mwb) 或生产源码，以保留发布边界验证。
-    implementation("io.github.gaoxiao228:mobile-web-bridge:${providers.gradleProperty("mwbVersion").getOrElse("0.1.7")}")
+    implementation("io.github.gaoxiao228:mobile-web-bridge:${providers.gradleProperty("mwbVersion").getOrElse("0.1.8")}")
 }
 
 tasks.register("verifyPublishedRuntimeDependencies") {
@@ -27,6 +27,11 @@ tasks.register("verifyPublishedRuntimeDependencies") {
                 it.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier
             }.map { "${it.group}:${it.module}:${it.version}" }.toSet()
         check("androidx.appcompat:appcompat:1.7.0" in modules)
-        check("com.google.android.gms:play-services-code-scanner:16.1.0" in modules)
+        check("com.google.mlkit:barcode-scanning:17.3.0" in modules)
+        for (artifact in listOf("camera-camera2", "camera-lifecycle", "camera-view")) {
+            check("androidx.camera:$artifact:1.4.2" in modules)
+        }
+        // bundled 内部使用 play-services-mlkit-barcode-scanning，不等同于旧扫码 UI。
+        check(modules.none { it.startsWith("com.google.android.gms:play-services-code-scanner:") })
     }
 }

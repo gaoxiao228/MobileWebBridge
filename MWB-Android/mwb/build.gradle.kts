@@ -7,7 +7,7 @@ plugins {
 
 // 坐标须先通过 Central 命名空间认证；配置存在不代表已经公开发布。
 group = "io.github.gaoxiao228"
-version = providers.gradleProperty("mwbVersion").getOrElse("0.1.7")
+version = providers.gradleProperty("mwbVersion").getOrElse("0.1.8")
 
 android {
     namespace = "com.mobilewebbridge"
@@ -77,7 +77,13 @@ publishing {
 
 dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    implementation("androidx.activity:activity:1.9.3")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("androidx.exifinterface:exifinterface:1.3.2")
+    // 使用随包分发的模型，不依赖设备安装 Play 服务或首次下载模型。
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mozilla:rhino:1.7.15")
     testImplementation("org.robolectric:robolectric:4.14.1")

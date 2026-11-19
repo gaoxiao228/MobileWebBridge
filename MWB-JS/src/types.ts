@@ -1,5 +1,5 @@
 // MWB 的公开契约以用户提供的旧 JS SDK 类型为基准，版本和产品命名已更新。
-export const version = "0.1.7";
+export const version = "0.1.8";
 
 type TYPE_VERSION = typeof version;
 
@@ -129,19 +129,19 @@ export type ParamPhoneCall = {
 
 export type ParamScanCode = {
 	/**
-	* 扫码类型  qrCode:二维码 barCode:条形码
+	* 扫码类型：qrCode 为二维码，barCode 为条形码。省略时识别两类。
 	**/
 	scanType?: ScanType[];
 	/**
-	* 是否隐藏相册按钮 如果不隐藏,则可以通过选择相册里的二维码识别
+	* 是否隐藏相册。省略时 iOS 显示、Android 隐藏；显式传入 false 可选图识别。
 	**/
 	hideAlbum?: boolean;
 	/**
-	* 权限提示 标题 用于Android 提示
+	* 兼容字段，目前不自定义系统相机权限提示标题。
 	**/
 	permissionPromptTitle?: string;
 	/**
-	* 权限提示内容 用于Android 提示
+	* 兼容字段，目前不自定义系统相机权限提示内容。
 	**/
 	permissionPromptMessage?: string;
 };

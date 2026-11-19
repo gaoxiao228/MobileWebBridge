@@ -1,6 +1,10 @@
 package com.mobilewebbridge
 
+import androidx.camera.core.CameraState
 import androidx.test.core.app.ApplicationProvider
+import com.mobilewebbridge.capabilities.MWBScanFlow
+import com.mobilewebbridge.capabilities.MWBScanOptions
+import com.mobilewebbridge.capabilities.MWBScannerChrome
 import com.mobilewebbridge.capabilities.StorageApi
 import com.mobilewebbridge.capabilities.MediaApi
 import com.mobilewebbridge.capabilities.NavigationApi
@@ -11,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.shadows.ShadowAlertDialog
+import android.graphics.RectF
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +27,38 @@ import wendu.dsbridge.CompletionHandler
 /** 分组隔离和不可信页面拒绝是原生能力的关键边界。 */
 @RunWith(RobolectricTestRunner::class)
 class CapabilitiesTest {
+    @Test fun scannerChromeCentersTheFrameAndReservesRoomInLandscape() {
+        // 双端用相同的安全区样本，避免两边各自调整后视觉漂移。
+        assertEquals(RectF(76f, 275f, 344f, 543f),
+            MWBScannerChrome.viewfinder(RectF(10f, 40f, 410f, 860f), 1f))
+        assertEquals(RectF(361f, 66f, 459f, 164f),
+            MWBScannerChrome.viewfinder(RectF(30f, 8f, 790f, 308f), 1f))
+    }
+
+    @Test fun scannerChromeKeepsTheFrameWhenAlbumIsHiddenAndRoutesActions() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        var closed = 0
+        var albums = 0
+        fun chrome(showAlbum: Boolean) = MWBScannerChrome(context, showAlbum, { closed++ }, { albums++ }).apply {
+            val width = View.MeasureSpec.makeMeasureSpec(480, View.MeasureSpec.EXACTLY)
+            val height = View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY)
+            measure(width, height)
+            layout(0, 0, 480, 800)
+        }
+        val withAlbum = chrome(true)
+        val withoutAlbum = chrome(false)
+        fun controls(view: MWBScannerChrome) = (0 until view.childCount).map(view::getChildAt)
+        fun hintTop(view: MWBScannerChrome) = controls(view).filterIsInstance<TextView>()
+            .single { it.text == "将二维码或条形码放入框内" }.top
+
+        assertEquals(hintTop(withAlbum), hintTop(withoutAlbum))
+        assertFalse(controls(withoutAlbum).any { it.contentDescription == "相册" })
+        assertTrue(controls(withAlbum).single { it.contentDescription == "相册" }.performClick())
+        assertTrue(controls(withAlbum).single { it.contentDescription == "关闭" }.performClick())
+        assertEquals(1, albums)
+        assertEquals(1, closed)
+    }
+
     @Test fun navigateAppearanceOverridesHostPerFieldBeforeFirstPageLoad() {
         // 打开只覆盖标题色时，宿主的独立按钮色仍保留，且不需要目标 JS。
         val config = MWBConfiguration("file:///android_asset/index.html", emptySet(),
@@ -486,13 +523,114 @@ class CapabilitiesTest {
         assertEquals("保存", action.text.toString())
     }
 
-    @Test fun unsupportedScannerAlbumOptionReturnsError() {
-        var code = 0
-        MediaApi(activity()).scanCode(JSONObject().put("hideAlbum", false), object : CompletionHandler<Any> {
-            override fun complete(retValue: Any) { code = (retValue as JSONObject).getInt("errCode") }
-            override fun complete() = Unit
-            override fun setProgressData(value: Any) = Unit
-        })
-        assertEquals(-1004, code)
+    private fun scanCallback(results: MutableList<JSONObject>) = object : CompletionHandler<Any> {
+        override fun complete(retValue: Any) { results += retValue as JSONObject }
+        override fun complete() = Unit
+        override fun setProgressData(value: Any) = Unit
     }
+
+    @Test fun scannerOptionsAndResultAreBackwardCompatible() {
+        val host = activity()
+        val shadow = org.robolectric.Shadows.shadowOf(host)
+        val api = MediaApi(host)
+        val responses = mutableListOf<JSONObject>()
+        val callback = scanCallback(responses)
+        // 无效类型不应打开相机、申请权限或占用后续调用。
+        listOf("[]", "[1]", "[\"unknown\"]", "\"qrCode\"").forEach { invalid ->
+            api.scanCode(JSONObject("{\"scanType\":$invalid}"), callback)
+            assertEquals(-1001, responses.last().getInt("errCode"))
+            assertNull(shadow.nextStartedActivityForResult)
+        }
+        api.scanCode(JSONObject().put("hideAlbum", false), callback)
+        val launch = shadow.nextStartedActivityForResult
+        assertNotNull("显式允许相册应该启动原生扫码", launch)
+        assertTrue(launch.intent.getBooleanExtra("showAlbum", false))
+        assertEquals(setOf("qrCode", "barCode"), launch.intent.getStringArrayListExtra("scanTypes")!!.toSet())
+        api.onActivityResult(launch.requestCode, android.app.Activity.RESULT_OK,
+            android.content.Intent().putExtra("scanType", "qrCode").putExtra("code", "mwb-offline"))
+        val success = responses.last()
+        assertEquals(0, success.getInt("errCode"))
+        assertEquals("qrCode", success.getJSONObject("result").getString("scanType"))
+        assertEquals("mwb-offline", success.getJSONObject("result").getString("code"))
+        api.scanCode(JSONObject(), callback)
+        val next = shadow.nextStartedActivityForResult
+        assertFalse(next.intent.getBooleanExtra("showAlbum", true))
+    }
+
+    @Test fun scannerRejectsConcurrentCallsAndIgnoresLateResults() {
+        val host = activity()
+        val shadow = org.robolectric.Shadows.shadowOf(host)
+        val api = MediaApi(host)
+        val first = mutableListOf<JSONObject>()
+        val second = mutableListOf<JSONObject>()
+        api.scanCode(JSONObject().put("hideAlbum", false), scanCallback(first))
+        val launch = requireNotNull(shadow.nextStartedActivityForResult)
+        assertTrue(first.isEmpty())
+        api.scanCode(JSONObject(), scanCallback(second))
+        assertEquals(-1008, second.single().getInt("errCode"))
+        assertNull(shadow.nextStartedActivityForResult)
+        repeat(2) { api.onActivityResult(launch.requestCode, android.app.Activity.RESULT_CANCELED, null) }
+        assertEquals(-1007, first.single().getInt("errCode"))
+        val third = mutableListOf<JSONObject>()
+        api.scanCode(JSONObject(), scanCallback(third))
+        val newRequest = requireNotNull(shadow.nextStartedActivityForResult)
+        // 旧结果即使晚于下一次启动，也不能清理或结算新的请求。
+        api.onActivityResult(launch.requestCode, android.app.Activity.RESULT_CANCELED, null)
+        assertTrue(third.isEmpty())
+        api.dispose()
+        api.onActivityResult(newRequest.requestCode, android.app.Activity.RESULT_CANCELED, null)
+        assertTrue(third.isEmpty())
+    }
+
+    @Test fun scannerFiltersCodesAndMapsTerminalFailures() {
+        val qr = com.mobilewebbridge.capabilities.MWBScanOptions(setOf("qrCode"), true)
+        fun flow() = com.mobilewebbridge.capabilities.MWBScanFlow(qr)
+        fun candidate(type: String, text: String?) = com.mobilewebbridge.capabilities.MWBScanCandidate(type, text)
+        val code = candidate("qrCode", "https://example.com/test")
+        val bar = candidate("barCode", "12345678")
+        val result = flow().apply { beginPick(); beginAlbumDecode() }
+            .albumResult(listOf(bar, candidate("qrCode", ""), code))!!
+        assertEquals("qrCode", result.scanType)
+        assertEquals(code.text, result.code)
+        assertEquals(-1004, flow().apply { beginPick(); beginAlbumDecode() }.albumResult(listOf(bar))!!.errorCode)
+        assertEquals(-1002, flow().apply { beginPick(); beginAlbumDecode() }.albumResult(null)!!.errorCode)
+        assertEquals(-1008, flow().fail(-1008, "Camera permission denied")!!.errorCode)
+        assertEquals(-1007, flow().fail(-1007, "Cancelled")!!.errorCode)
+    }
+
+    @Test fun scannerOnlySettlesCurrentCameraOnCriticalError() {
+        val flow = MWBScanFlow(MWBScanOptions(setOf("qrCode"), showAlbum = true))
+        val current = flow.cameraEpoch
+        val busy = CameraState.StateError.create(CameraState.ERROR_CAMERA_IN_USE)
+        val fatal = CameraState.StateError.create(CameraState.ERROR_CAMERA_FATAL_ERROR)
+        assertNull(flow.cameraError(current, busy))
+        assertTrue(flow.beginPick())
+        assertNull(flow.cameraError(current, fatal))
+        flow.cancelPick()
+        assertEquals(-1004, flow.cameraError(flow.cameraEpoch, fatal)?.errorCode)
+        assertNull(flow.cameraError(flow.cameraEpoch, fatal))
+    }
+
+    @Test fun scannerIgnoresCameraResultUntilAlbumReturns() {
+        val scan = com.mobilewebbridge.capabilities.MWBScanFlow(
+            com.mobilewebbridge.capabilities.MWBScanOptions(setOf("qrCode"), true))
+        val candidates = listOf(com.mobilewebbridge.capabilities.MWBScanCandidate("qrCode", "mwb-offline"))
+        val old = scan.cameraEpoch
+        assertTrue(scan.beginPick())
+        assertNull(scan.cameraResult(old, candidates))
+        scan.cancelPick()
+        assertNull(scan.cameraResult(old, candidates))
+        val next = scan.cameraEpoch
+        assertTrue(scan.beginPick())
+        scan.beginAlbumDecode()
+        assertNull(scan.cameraResult(next, candidates))
+        assertEquals("mwb-offline", scan.albumResult(candidates)?.code)
+        assertNull(scan.albumResult(candidates))
+        val resumed = com.mobilewebbridge.capabilities.MWBScanFlow(
+            com.mobilewebbridge.capabilities.MWBScanOptions(setOf("qrCode"), true))
+        resumed.beginPick()
+        resumed.cancelPick()
+        assertEquals("mwb-offline", resumed.cameraResult(resumed.cameraEpoch, candidates)?.code)
+    }
+
 }

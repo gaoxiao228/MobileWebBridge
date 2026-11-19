@@ -36,7 +36,12 @@ def verify_publication(repository: Path, version: str) -> None:
         for dependency in pom.findall("m:dependencies/m:dependency", namespace)
     }
     assert ("androidx.appcompat", "appcompat", "1.7.0") in dependencies
-    assert ("com.google.android.gms", "play-services-code-scanner", "16.1.0") in dependencies
+    assert ("com.google.mlkit", "barcode-scanning", "17.3.0") in dependencies
+    for artifact in ("camera-camera2", "camera-lifecycle", "camera-view"):
+        assert ("androidx.camera", artifact, "1.4.2") in dependencies
+    # bundled 版本有自己的传递依赖；不能把 unbundled 或旧扫码 UI 直接写入 POM。
+    assert not any(artifact in {"play-services-code-scanner", "play-services-mlkit-barcode-scanning"}
+                   for _, artifact, _ in dependencies)
     with ZipFile(directory / f"{basename}.aar") as aar:
         assert "AndroidManifest.xml" in aar.namelist()
         # 必须检查实际发布包，不让源码目录中的默认页掩盖漏打包。
@@ -60,7 +65,7 @@ def verify_publication(repository: Path, version: str) -> None:
 def main() -> None:
     """使用仓库自带 Wrapper，允许 CI 通过环境设置 JDK 17 和 Android SDK 35。"""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="0.1.7", help="候选本地发布版本")
+    parser.add_argument("--version", default="0.1.8", help="候选本地发布版本")
     parser.add_argument("--offline", action="store_true", help="仅使用已有 Gradle 缓存")
     arguments = parser.parse_args()
     root = Path(__file__).resolve().parents[1]

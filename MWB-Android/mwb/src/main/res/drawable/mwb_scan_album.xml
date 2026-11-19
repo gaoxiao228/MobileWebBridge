@@ -1,0 +1,6 @@
+<!-- 扫码页相册图标；叠放的照片与系统选图入口对应。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp" android:height="22dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M8,14 V5 Q8,3 10,3 H19 Q21,3 21,5 V14 Q21,16 19,16 H10 Q8,16 8,14 Z M8,13 L12,9 L15,12 L17,10 L21,14 M5,8 Q3,8 3,10 V19 Q3,21 5,21 H14 Q16,21 16,19 M16.8,7 H17"
+        android:strokeColor="#F7FAF9" android:strokeWidth="1.7" android:strokeLineJoin="round" android:strokeLineCap="round" />
+</vector>

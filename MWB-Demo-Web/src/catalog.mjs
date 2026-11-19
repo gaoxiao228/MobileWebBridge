@@ -40,7 +40,15 @@ export const catalog = [
   item('clearStorageSync', '清空分组存储', '清除 demo 分组中的全部存储值。', 'storage', ['demo'], { confirm: '将清空 demo 分组。' }),
 
   item('compressImage', '压缩图片', '把所选图片的 Base64 压缩到目标大小。', 'media', [{ base64Image: '{{imageBase64}}', maxLength: 512000 }]),
-  item('scanCode', '扫描二维码', '打开原生扫码界面并返回内容。', 'media', [{ scanType: ['qrCode'], hideAlbum: true }], { note: 'Android 需要 Google Play 服务；不支持相册扫码。' }),
+  // 默认呈现完整扫码界面；相机预设仍可体验隐藏相册的布局。
+  item('scanCode', '扫码', '通过原生相机或相册识别二维码和条形码。', 'media', [{ scanType: ['qrCode', 'barCode'], hideAlbum: false }], {
+    note: '运行后会申请相机权限。扫码页底部可打开相册；选择仅相机的预设可隐藏入口。',
+    presets: [
+      { label: '相机二维码', args: [{ scanType: ['qrCode'], hideAlbum: true }] },
+      { label: '相机条形码', args: [{ scanType: ['barCode'], hideAlbum: true }] },
+      { label: '允许相册', args: [{ scanType: ['qrCode', 'barCode'], hideAlbum: false }] },
+    ],
+  }),
   item('saveImageToPhotosAlbum', '保存图片到相册', '将所选图片保存到系统相册。', 'media', [{ base64Image: '{{imageBase64}}' }], { confirm: '将向系统相册写入图片。' }),
   item('chooseImage', '选择图片', '从系统相册选择一张图片。', 'media', [{ sourceType: 'album', sizeType: ['original'], count: 1 }], { note: '返回的是原生文件路径，可供后续路径类方法使用。' }),
   item('openFile', '打开 PDF', '用原生能力打开 PDF 文件。', 'media', [{ url: '{{pdfURL}}', fileName: 'demo.pdf' }], { note: 'Android 只接受 HTTPS PDF 或 MWB 缓存路径。', confirm: '将打开原生 PDF 查看页面。' }),

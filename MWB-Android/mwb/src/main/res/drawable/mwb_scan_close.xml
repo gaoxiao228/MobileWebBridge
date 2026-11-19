@@ -1,0 +1,6 @@
+<!-- 扫码页关闭图标，线宽与相册图标一致。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp" android:height="22dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M6,6 L18,18 M18,6 L6,18" android:strokeColor="#F7FAF9"
+        android:strokeWidth="1.8" android:strokeLineCap="round" />
+</vector>

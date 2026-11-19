@@ -24,6 +24,31 @@ test('H5 目录覆盖展示方法，但不提供容器就绪入口', () => {
   }
 });
 
+test('扫码示例覆盖相机二维码、相机条形码和相册', async () => {
+  const [item] = catalog.filter(entry => entry.name === 'scanCode');
+  const expected = [
+    { scanType: ['qrCode'], hideAlbum: true },
+    { scanType: ['barCode'], hideAlbum: true },
+    { scanType: ['qrCode', 'barCode'], hideAlbum: false }
+  ];
+  // 直接运行示例就应展示完整扫码页；仍保留两个不显示相册的预设。
+  assert.deepEqual(item.args, [expected[2]]);
+  assert.deepEqual(item.presets?.map(preset => preset.args), expected.map(value => [value]));
+  const result = { errCode: 0, result: { scanType: 'qrCode', code: 'https://example.com/test' } };
+  const cancelled = Object.assign(new Error('Cancelled'), { errCode: -1007 });
+  const calls = [];
+  const runner = createRunner({ async scanCode(params) {
+    calls.push(params);
+    if (!params.hideAlbum) throw cancelled;
+    return result;
+  } }, () => {});
+  for (const preset of item.presets.slice(0, 2)) {
+    assert.equal(await runner.run(item, JSON.stringify(preset.args), {}), result);
+  }
+  await assert.rejects(runner.run(item, JSON.stringify(item.presets[2].args), {}), error => error === cancelled);
+  assert.deepEqual(calls, expected);
+});
+
 test('图片占位符缺少输入时阻止原生调用', () => {
   const item = catalog.find(entry => entry.name === 'compressImage');
   assert.throws(() => resolveArgs(item, JSON.stringify(item.args), {}), /先选择图片/);

@@ -4,6 +4,8 @@
 
 原生插件扩展额外修改 `CompletionHandler.java`：新增默认 `completeForDocument`，保持原有调用方式兼容；`DWebView.java` 新增文档受守卫的回调、事件发送路径。新增本项目的 `DocumentScriptGuard.java` 在 JS 实际执行时通过同步 `mwb.pluginSession` 校验原生文档身份，防止旧文档脚本调用或删除新文档同名回调；basic 仍使用原上游完成和事件路径。
 
+Android 离线扫码通过 Gradle 依赖引入 AndroidX CameraX、Activity、ExifInterface 和 Google ML Kit Barcode Scanning（含随包分发的模型），未复制这些库的源码。各组件的许可与通知以其发行制品为准。
+
 测试依赖 Mozilla Rhino 1.7.15（MPL 2.0）仅用于 JVM 执行生成的守卫脚本，不打入 AAR/APK 运行时依赖。
 
 ---

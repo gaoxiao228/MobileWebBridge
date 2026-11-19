@@ -27,10 +27,18 @@ final class MWBMediaCoordinator: NSObject, PHPickerViewControllerDelegate,
 
     private func finish(_ result: MWBResult) {
         DispatchQueue.main.async {
-            self.presented?.dismiss(animated: true)
-            self.pending?(result.jsonString, true)
-            self.pending = nil
-            self.presented = nil
+            let deliver = {
+                // 清理状态后才回调，允许 H5 在上一次结算后立即重试。
+                let callback = self.pending
+                self.pending = nil
+                self.presented = nil
+                callback?(result.jsonString, true)
+            }
+            if let presented = self.presented, presented.presentingViewController != nil {
+                presented.dismiss(animated: true, completion: deliver)
+            } else {
+                deliver()
+            }
         }
     }
 
@@ -153,25 +161,31 @@ final class MWBMediaCoordinator: NSObject, PHPickerViewControllerDelegate,
     }
 
     func scan(params: [String: Any], callback: @escaping MWBJSCallback) {
+        guard let options = MWBScanOptions(params: params) else {
+            callback(MWBResult.failure(-1001, "Invalid scan type").jsonString, true)
+            return
+        }
         guard begin(callback) else { return }
         let status = AVCaptureDevice.authorizationStatus(for: .video)
-        let present: () -> Void = {
-            guard let controller = self.controller else {
+        let present: () -> Void = { [weak self] in
+            guard let self else { return }
+            guard let controller = self.controller, controller.viewIfLoaded?.window != nil else {
                 self.finish(.failure(-1005, "Container is unavailable"))
                 return
             }
-            let scanner = MWBScannerViewController(
-                scanTypes: params["scanType"] as? [String] ?? ["qrCode", "barCode"],
-                showAlbum: !(params["hideAlbum"] as? Bool ?? false)
-            ) { result in self.finish(result) }
+            guard controller.presentedViewController == nil else {
+                self.finish(.failure(-1008, "Another media operation is in progress"))
+                return
+            }
+            let scanner = MWBScannerViewController(options: options) { [weak self] result in self?.finish(result) }
             self.presented = scanner
             controller.present(scanner, animated: true)
         }
         if status == .notDetermined {
-            AVCaptureDevice.requestAccess(for: .video) { granted in
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     if granted { present() }
-                    else { self.finish(.failure(-1008, "Camera permission denied")) }
+                    else { self?.finish(.failure(-1008, "Camera permission denied")) }
                 }
             }
         } else if status == .authorized {

@@ -345,6 +345,11 @@ function clearEvents() {
             <button type="button" class="quiet-button" :disabled="busy" @click="setNavigationWait(false)">立即转场（对照）</button>
           </div>
           <p v-if="['navigateTo', 'redirectTo'].includes(active.name)" class="method-note">仅 iOS 支持等待绘制，最多 3 秒；失败保留当前页。成功表示已发起导航，异步业务数据可能仍在加载。</p>
+          <!-- 预设只填入参数，不会提前打开相机。 -->
+          <div v-if="active.presets" class="section-head">
+            <button v-for="preset in active.presets" :key="preset.label" type="button" class="quiet-button" :disabled="busy"
+              @click="argsInput = JSON.stringify(preset.args, null, 2)">{{ preset.label }}</button>
+          </div>
           <label class="sr-only" for="args-input">调用参数 JSON</label>
           <textarea id="args-input" v-model="argsInput" class="args-editor" spellcheck="false" autocomplete="off"></textarea>
           <div v-if="needsImage" class="image-picker">
