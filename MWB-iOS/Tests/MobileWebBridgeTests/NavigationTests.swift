@@ -133,8 +133,11 @@ final class NavigationTests: XCTestCase {
         XCTAssertEqual(navigation.navigationBar.standardAppearance.titleTextAttributes[.foregroundColor] as? UIColor,
                        UIColor(red: 1, green: 1, blue: 1, alpha: 1))
         let back = try XCTUnwrap(target.navigationItem.leftBarButtonItem?.customView as? UIButton)
-        XCTAssertEqual(back.title(for: .normal), "返回")
-        XCTAssertNotNil(back.image(for: .normal))
+        // 箭头文字按钮使用 UIButton.Configuration，数据不会写入旧的 UIControl.State 存储。
+        let configuration = try XCTUnwrap(back.configuration)
+        let backTitle = try XCTUnwrap(configuration.attributedTitle)
+        XCTAssertEqual(String(backTitle.characters), "返回")
+        XCTAssertNotNil(configuration.image)
         XCTAssertGreaterThanOrEqual(back.bounds.height, 44)
     }
 
