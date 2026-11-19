@@ -133,6 +133,7 @@ open class MWBWebViewController: UIViewController {
     var initialPageOverride: URL?
     var initialNavigationBarHidden: Bool?
     private var navigationBarState: MWBNavigationBarSnapshot?
+    private var defersNavigationBarRestore = false
     private var navigationStyle: MWBNavigationBarAppearance
     private var initialNavigationPatch: MWBNavigationBarPatch?
     private var navigationShowBackButton: Bool?
@@ -348,9 +349,36 @@ open class MWBWebViewController: UIViewController {
         if let navigation = navigationController {
             // 只有真实入栈的目标才启用隔离；离屏准备、取消和失败都不修改宿主标志。
             if usesIsolatedAppearance, navigation.topViewController === self { navigation.mwbNavigationState.isolated = true }
-            navigationBarState?.restore(navigation)
+            if !fadeNavigationBarForInteractivePop(in: navigation) {
+                navigationBarState?.restore(navigation)
+            }
         }
         configureBackButton()
+    }
+
+    private func fadeNavigationBarForInteractivePop(in navigation: UINavigationController) -> Bool {
+        guard navigationBarState?.hidden == true, !navigation.isNavigationBarHidden,
+              let transition = transitionCoordinator, transition.isInteractive,
+              transition.viewController(forKey: .to) === self,
+              let source = transition.viewController(forKey: .from),
+              !navigation.viewControllers.contains(where: { $0 === source }) else { return false }
+
+        // 栏仍占据原来的布局；只让 UIKit 随手势改变透明度，取消时可以反向播放。
+        let bar = navigation.navigationBar
+        let originalAlpha = bar.alpha
+        defersNavigationBarRestore = true
+        let queued = transition.animateAlongsideTransition(in: navigation.view, animation: { _ in
+            bar.alpha = 0
+        }, completion: { [weak self, weak navigation] context in
+            self?.defersNavigationBarRestore = false
+            // 成功后才提交目标页的布局；取消交给来源页原有的 appearance 恢复流程。
+            if !context.isCancelled, let self, let navigation, navigation.topViewController === self {
+                self.navigationBarState?.restore(navigation)
+            }
+            bar.alpha = originalAlpha
+        })
+        if !queued { defersNavigationBarRestore = false }
+        return queued
     }
 
     /// 打开补丁在宿主初始化后、加载目标文档前应用；不会写来源页的共享栏。
@@ -375,7 +403,8 @@ open class MWBWebViewController: UIViewController {
         prepareNavigationBarState()
         if let navigation = navigationController, navigation.topViewController === self {
             if usesIsolatedAppearance { navigation.mwbNavigationState.isolated = true }
-            navigationBarState?.restore(navigation)
+            // 交互中仍保存新主题，等目标真正出现，再将最新状态应用到共享栏。
+            if !defersNavigationBarRestore { navigationBarState?.restore(navigation) }
         }
         configureBackButton()
         if let button = navigationItem.rightBarButtonItem { styleActionButton(button) }
