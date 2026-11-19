@@ -78,7 +78,8 @@ extension MWBBridgeAdapter {
             return
         }
         let sourceRevision = controller.documentRevision
-        DispatchQueue.main.async {
+        // 主队列准备期间保留来源；下面可能延迟执行的 show 回调仍使用弱引用。
+        DispatchQueue.main.async { [controller] in
             // JS 发出请求后、主队列开始准备前，来源也可能已整页导航。
             guard controller.documentRevision == sourceRevision else { return }
             guard controller.pendingNavigation == nil, controller.navigationPreparation == nil else {

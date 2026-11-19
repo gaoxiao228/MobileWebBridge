@@ -35,7 +35,7 @@ private class SampleHost(private val context: Context) : MWBHost {
         container.onGoHome = { current -> current.load("file:///android_asset/index.html") }
     }
     override fun appInfo(): JSONObject = JSONObject().put("appId", context.packageName)
-        .put("appVersionName", "0.1.8").put("appVersionCode", 8).put("environment", 0)
+        .put("appVersionName", "0.1.9").put("appVersionCode", 9).put("environment", 0)
     override fun nativePage(name: String, extInfo: JSONObject?): Intent? = when (name) {
         "sample" -> Intent(context, SampleNativeActivity::class.java)
         else -> null

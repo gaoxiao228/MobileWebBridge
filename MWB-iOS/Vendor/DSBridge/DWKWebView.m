@@ -4,6 +4,15 @@
 #import "InternalApis.h"
 #import <objc/message.h>
 
+// 保留 DSBridge 的转义规则，避免改变已有 decodeURIComponent 回调的数据格式。
+static NSString *MWBEncodeLegacyBridgeString(NSString *value)
+{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    return [value stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+#pragma clang diagnostic pop
+}
+
 @implementation DWKWebView
 {
     void (^alertHandler)(void);
@@ -96,6 +105,9 @@ completionHandler:(void (^)(NSString * _Nullable result))completionHandler
             if(jsDialogBlock){
                 promptHandler=completionHandler;
             }
+            // 没有宿主 UI delegate 时保留独立 DWKWebView 的旧弹窗路径。
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             UIAlertView *alert = [[UIAlertView alloc]
                                   initWithTitle:prompt
                                   message:@""
@@ -107,6 +119,7 @@ completionHandler:(void (^)(NSString * _Nullable result))completionHandler
             txtName = [alert textFieldAtIndex:0];
             txtName.text=defaultText;
             [alert show];
+#pragma clang diagnostic pop
         }
     }
 }
@@ -130,6 +143,9 @@ completionHandler:(void (^)(void))completionHandler
         if(jsDialogBlock){
             alertHandler=completionHandler;
         }
+        // 保留没有宿主 UI delegate 时的旧弹窗行为。
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         UIAlertView *alertView =
         [[UIAlertView alloc] initWithTitle:dialogTextDic[@"alertTitle"]?dialogTextDic[@"alertTitle"]:@"提示"
                                    message:message
@@ -137,6 +153,7 @@ completionHandler:(void (^)(void))completionHandler
                          cancelButtonTitle:dialogTextDic[@"alertBtn"]?dialogTextDic[@"alertBtn"]:@"确定"
                          otherButtonTitles:nil,nil];
         [alertView show];
+#pragma clang diagnostic pop
     }
 }
 
@@ -157,6 +174,9 @@ initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completi
         if(jsDialogBlock){
             confirmHandler=completionHandler;
         }
+        // 保留没有宿主 UI delegate 时的旧弹窗行为。
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         UIAlertView *alertView =
         [[UIAlertView alloc] initWithTitle:dialogTextDic[@"confirmTitle"]?dialogTextDic[@"confirmTitle"]:@"提示"
                                    message:message
@@ -164,6 +184,7 @@ initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completi
                          cancelButtonTitle:dialogTextDic[@"confirmCancelBtn"]?dialogTextDic[@"confirmCancelBtn"]:@"取消"
                          otherButtonTitles:dialogTextDic[@"confirmOkBtn"]?dialogTextDic[@"confirmOkBtn"]:@"确定", nil];
         [alertView show];
+#pragma clang diagnostic pop
     }
 }
 
@@ -182,6 +203,10 @@ initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completi
     }
 }
 
+// 仅保留 WebKit 旧预览回调的 delegate 转发，不隐藏其他 WebKit 警告。
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wdeprecated-implementations"
 - (BOOL)webView:(WKWebView *)webView shouldPreviewElement:(WKPreviewElementInfo *)elementInfo{
     if( self.DSUIDelegate
        && [self.DSUIDelegate respondsToSelector:
@@ -211,6 +236,11 @@ initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completi
     }
 }
 
+#pragma clang diagnostic pop
+
+// 该委托方法只处理上方旧弹窗的按钮点击。
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
 {
     if(dialogType==1 && alertHandler){
@@ -229,15 +259,16 @@ initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completi
         txtName=nil;
     }
 }
+#pragma clang diagnostic pop
 
 - (void) evalJavascript:(int) delay{
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_MSEC)), dispatch_get_main_queue(), ^{
         @synchronized(self){
-            if([jsCache length]!=0){
-                [self evaluateJavaScript :jsCache completionHandler:nil];
-                isPending=false;
-                jsCache=@"";
-                lastCallTime=[[NSDate date] timeIntervalSince1970]*1000;
+            if([self->jsCache length]!=0){
+                [self evaluateJavaScript :self->jsCache completionHandler:nil];
+                self->isPending=false;
+                self->jsCache=@"";
+                self->lastCallTime=[[NSDate date] timeIntervalSince1970]*1000;
             }
         }
     });
@@ -267,7 +298,7 @@ initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completi
         do{
             if(args && (cb= args[@"_dscbstub"])){
                 if([JavascriptInterfaceObject respondsToSelector:selasyn]){
-                    __weak typeof(self) weakSelf = self;
+                    // 原回调通过同步锁和实例变量已强捕获 self，显式保留其生命周期。
                     void (^completionHandler)(id,BOOL) = ^(id value,BOOL complete){
                         NSString *del=@"";
                         result[@"code"]=@0;
@@ -275,24 +306,23 @@ initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completi
                             result[@"data"]=value;
                         }
                         value=[JSBUtil objToJsonString:result];
-                        value=[value stringByAddingPercentEscapesUsingEncoding: NSUTF8StringEncoding];
+                        value=MWBEncodeLegacyBridgeString(value);
 
                         if(complete){
                             del=[@"delete window." stringByAppendingString:cb];
                         }
                         NSString*js=[NSString stringWithFormat:@"try {%@(JSON.parse(decodeURIComponent(\"%@\")).data);%@; } catch(e){};",cb,(value == nil) ? @"" : value,del];
-                        __strong typeof(self) strongSelf = weakSelf;
                         @synchronized(self)
                         {
                             UInt64  t=[[NSDate date] timeIntervalSince1970]*1000;
-                            jsCache=[jsCache stringByAppendingString:js];
-                            if(t-lastCallTime<50){
-                                if(!isPending){
-                                    [strongSelf evalJavascript:50];
-                                    isPending=true;
+                            self->jsCache=[self->jsCache stringByAppendingString:js];
+                            if(t-self->lastCallTime<50){
+                                if(!self->isPending){
+                                    [self evalJavascript:50];
+                                    self->isPending=true;
                                 }
                             }else{
-                                [strongSelf evalJavascript:0];
+                                [self evalJavascript:0];
                             }
                         }
 
@@ -312,7 +342,7 @@ initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completi
                 }
                 break;
             }
-            NSString*js=[error stringByAddingPercentEscapesUsingEncoding: NSUTF8StringEncoding];
+            NSString*js=MWBEncodeLegacyBridgeString(error);
             if(isDebug){
                 js=[NSString stringWithFormat:@"window.alert(decodeURIComponent(\"%@\"));",js];
                 [self evaluateJavaScript :js completionHandler:nil];

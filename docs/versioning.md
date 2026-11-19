@@ -1,15 +1,17 @@
 # 版本、支持范围与升级
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本为 `0.1.8`，公共制品待核验。`0.1.5` 于 2026-11-09 通过 npm、Maven 公共仓库独立消费及 iOS Git Pod Release 接入验证。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本为 `0.1.9`，公共制品待核验。`0.1.5` 于 2026-11-09 通过 npm、Maven 公共仓库独立消费及 iOS Git Pod Release 接入验证。
 
 ## 当前状态
 
 | 组件 | 当前版本 | 获取方式与状态 |
 | --- | --- | --- |
-| JS SDK | `0.1.8` | 目标 npm 版本，公共制品待核验；支持本地源码构建 |
-| iOS | `0.1.8` | 通过共享 Git Tag 或本地 Pod 接入；不发布公共 CocoaPods Specs |
-| Android | `0.1.8` | 目标 Maven Central 版本，公共制品待核验；支持源码与本地 Maven |
-| Demo Web | `0.1.8` | 与本轮 SDK 配套，构建号 8 |
+| JS SDK | `0.1.9` | 目标 npm 版本，公共制品待核验；支持本地源码构建 |
+| iOS | `0.1.9` | 通过共享 Git Tag 或本地 Pod 接入；不发布公共 CocoaPods Specs |
+| Android | `0.1.9` | 目标 Maven Central 版本，公共制品待核验；支持源码与本地 Maven |
+| Demo Web | `0.1.9` | 与本轮 SDK 配套，构建号 9 |
+
+`0.1.9` 修复 iOS 严格 CocoaPods 校验中的编译警告，保留现有桥接行为和两端扫码能力；没有新接口，也不改变插件协议。
 
 `0.1.8` 统一 iOS、Android 的原生扫码界面。两端可用相机或系统选图识别二维码和条形码；Android 使用 CameraX 和随应用分发的 ML Kit 模型，不再依赖设备安装 Google Play 服务或首次下载模型。显式传入 `hideAlbum: false` 可在两端显示相册入口。
 
@@ -21,7 +23,7 @@
 
 继续保留 `0.1.4` 的 iOS 默认 WebView 自动预热与可选导航绘制准备，以及既有 HTML 错误页、业务首页回调和默认星号来源配置。自动准备不代表异步业务数据已完成。
 
-安装示例固定使用 `0.1.8`。核实实时 npm 状态可运行：
+安装示例固定使用 `0.1.9`。核实实时 npm 状态可运行：
 
 ```bash
 npm view mobile-web-bridge dist-tags versions --json --registry=https://registry.npmjs.org/
@@ -33,6 +35,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | H5 SDK | iOS / Android 源码 | 插件协议 | 范围 |
 | --- | --- | --- | --- |
+| `0.1.9` | iOS / Android `0.1.9` | `1` | iOS 严格 CocoaPods 校验修复；延续扫码与现有桥接接口 |
 | `0.1.8` | iOS / Android `0.1.8` | `1` | 统一原生扫码页；Android 离线识别及系统选图 |
 | `0.1.7` | iOS / Android `0.1.7` | `1` | 延续 `0.1.6` API；iOS 可见导航栏侧滑返回无栏页时随手势淡出 |
 | `0.1.6` | iOS / Android `0.1.6` | `1` | 在 `0.1.5` 基础上增加导航栏外观与首帧配置；iOS 26 及以上可隐藏按钮背景 |
@@ -46,6 +49,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | 共享 Git Tag | iOS Pod 版本 | Android Maven 版本 | JS npm 版本 | 状态 |
 | --- | --- | --- | --- | --- |
+| `0.1.9` | `0.1.9` | `0.1.9` | `0.1.9` | 目标版本，制品状态待核验 |
 | `0.1.8` | `0.1.8` | `0.1.8` | `0.1.8` | 目标版本，制品状态待核验 |
 | `0.1.7` | `0.1.7` | `0.1.7` | `0.1.7` | 目标版本，制品状态待核验 |
 | `0.1.6` | `0.1.6` | `0.1.6` | `0.1.6` | GitHub Tag 与 npm 已公开，iOS Git Pod Release 接入验证通过；Maven Central 待发布 |
@@ -54,7 +58,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 | `0.1.3` | `0.1.3` | `0.1.3` | `0.1.3` | GitHub Tag、npm 与 Maven Central 已公开；iOS Git Pod 验证通过 |
 | `0.1.1` | `0.1.0` | `0.1.1` | `0.1.1-beta.1` | Android Maven 已发布，含加载与就绪回调；H5 仍需当前 JS 源码，iOS 未发布公共 Specs |
 
-共享 Tag 是仓库源码标识，各端已发布版本不得覆盖。当前配套源码版本为 `0.1.8`，Podspec 的 `s.source[:tag]` 对应共享 Tag `0.1.8`，支持 Git Pod 或本地源码接入。历史 Tag `0.1.2` 已移除，npm `0.1.2` 包继续保留；既有共享 Tag `0.1.1` 保留。Maven 坐标中的版本和 npm 包版本按本表记录，不由 Git Tag 自动修改。
+共享 Tag 是仓库源码标识，各端已发布版本不得覆盖。当前配套源码版本为 `0.1.9`，Podspec 的 `s.source[:tag]` 对应共享 Tag `0.1.9`，支持 Git Pod 或本地源码接入。历史 Tag `0.1.2` 已移除，npm `0.1.2` 包继续保留；既有共享 Tag `0.1.1` 保留。Maven 坐标中的版本和 npm 包版本按本表记录，不由 Git Tag 自动修改。
 
 npm 的 `latest`、`next` 是包分发标签，与 Git Tag 分开管理，不需要因此再创建 JS 专属的 Git Tag。
 

@@ -4,7 +4,7 @@ android {
     namespace = "com.mobilewebbridge.sample"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.mobilewebbridge.sample"; minSdk = 24; targetSdk = 35; versionCode = 8; versionName = "0.1.8"
+        applicationId = "com.mobilewebbridge.sample"; minSdk = 24; targetSdk = 35; versionCode = 9; versionName = "0.1.9"
         // 无额外测试依赖的系统 Instrumentation，用于真实内核恢复验收。
         testInstrumentationRunner = "com.mobilewebbridge.sample.ErrorPageInstrumentation"
     }

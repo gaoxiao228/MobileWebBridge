@@ -422,11 +422,14 @@ open class MWBWebViewController: UIViewController {
         let style = navigationStyle.backButtonStyle ?? .text
         let item: UIBarButtonItem
         if style == .arrowText {
-            let button = UIButton(type: .system)
-            button.setTitle(text, for: .normal)
-            button.setImage(UIImage(systemName: "chevron.backward"), for: .normal)
-            button.titleLabel?.font = navigationStyle.buttonFont(traits: traitCollection) ?? .systemFont(ofSize: 17)
-            button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
+            // 保留箭头、文字字号与水平留白，改用 iOS 15 的按钮配置。
+            var configuration = UIButton.Configuration.plain()
+            var title = AttributedString(text)
+            title.font = navigationStyle.buttonFont(traits: traitCollection) ?? .systemFont(ofSize: 17)
+            configuration.attributedTitle = title
+            configuration.image = UIImage(systemName: "chevron.backward")
+            configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4)
+            let button = UIButton(configuration: configuration)
             button.addTarget(self, action: #selector(handleBackButton), for: .touchUpInside)
             button.accessibilityLabel = text
             button.sizeToFit()
@@ -559,7 +562,10 @@ open class MWBWebViewController: UIViewController {
         guard let webView else { navigationController?.popViewController(animated: true); return }
         var resolved = false
         // 页面缺少 SDK 或 JS 句柄时 DSBridge 可能不回调，原生超时回退。
-        let fallback = { [weak self] in self?.navigationController?.popViewController(animated: true) }
+        let fallback = { [weak self] in
+            // 此处只需要执行返回，不使用被弹出的控制器。
+            _ = self?.navigationController?.popViewController(animated: true)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             guard !resolved else { return }
             resolved = true
