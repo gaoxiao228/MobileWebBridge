@@ -1,5 +1,5 @@
-import { version, type MWBJSSDK, type ParamNavigationBarTheme } from "./types";
-import { createEvents } from "./events";
+import { version, type MWBJSSDK, type ParamNavigationBarTheme } from "./types.js";
+import { createEvents } from "./events.js";
 
 /** 插件描述只包含所选功能，供浏览器组合包静态裁剪。 */
 export interface MWBPlugin {

@@ -1,4 +1,4 @@
-import type { DSBridgeLike } from "./bridge";
+import type { DSBridgeLike } from "./bridge.js";
 
 type Handler = (...args: unknown[]) => unknown;
 const hubs = new WeakMap<DSBridgeLike, EventHub>();

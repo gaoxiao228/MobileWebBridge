@@ -1,5 +1,5 @@
-import { callAsync, callSync } from "../bridge";
-import type { MWBJSSDK } from "../types";
+import { callAsync, callSync } from "../bridge.js";
+import type { MWBJSSDK } from "../types.js";
 
 /** 应用、设备及系统设置能力。 */
 export const devicePlugin = {

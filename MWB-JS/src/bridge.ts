@@ -1,4 +1,4 @@
-import type { GenericAsyncResult } from "./types";
+import type { GenericAsyncResult } from "./types.js";
 
 /** DSBridge 的最小接口，便于把原生通信限制在一个文件内。 */
 export interface DSBridgeLike {

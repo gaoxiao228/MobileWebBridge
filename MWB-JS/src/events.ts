@@ -1,6 +1,6 @@
-import type { GenericCallbackFunc, MWBJSSDK } from "./types";
-import type { DSBridgeLike } from "./bridge";
-import { getEventHub } from "./eventHub";
+import type { GenericCallbackFunc, MWBJSSDK } from "./types.js";
+import type { DSBridgeLike } from "./bridge.js";
+import { getEventHub } from "./eventHub.js";
 
 type EventName = "networkStatusChange" | "appShow" | "appHide" |
   "remoteNotificationReceive" | "pageShow" | "pageHide";

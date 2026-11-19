@@ -1,7 +1,7 @@
-import { apiMethods } from "./apiManifest";
-import { getBridge, MWBBridgeError, type DSBridgeLike } from "./bridge";
-import { getEventHub } from "./eventHub";
-import type { GenericAsyncResult } from "./types";
+import { apiMethods } from "./apiManifest.js";
+import { getBridge, MWBBridgeError, type DSBridgeLike } from "./bridge.js";
+import { getEventHub } from "./eventHub.js";
+import type { GenericAsyncResult } from "./types.js";
 
 const descriptorBrand = Symbol("MWBNativePlugin");
 const reserved = new Set<string>([...apiMethods, "basic", "version", "hasPlugin", "pluginSession", "pluginInfo", "invokePlugin", "pluginEvent", "dispatchEvent", "backBtnPressed", "on", "then", "catch", "finally", "toJSON", "inspect", "constructor", "prototype", "__proto__"]);

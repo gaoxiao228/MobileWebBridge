@@ -1,5 +1,5 @@
-import { callSync } from "../bridge";
-import type { MWBJSSDK, ReturnStorageResult } from "../types";
+import { callSync } from "../bridge.js";
+import type { MWBJSSDK, ReturnStorageResult } from "../types.js";
 
 /** 按可选分组名隔离的同步存储能力。 */
 export const storagePlugin = {

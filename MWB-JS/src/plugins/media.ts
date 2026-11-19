@@ -1,5 +1,5 @@
-import { callAsync } from "../bridge";
-import type { MWBJSSDK } from "../types";
+import { callAsync } from "../bridge.js";
+import type { MWBJSSDK } from "../types.js";
 
 /** 图片、扫码、权限及文件能力。 */
 export const mediaPlugin = {

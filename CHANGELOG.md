@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.2.0 — 2026-11-19
+
+- 修复 npm 包在 TypeScript `node16` / `nodenext` 模式下无法导入公开类型、`mwb` 退化为 `any` 的问题；保留 `bundler` 支持（[#1](https://github.com/gaoxiao228/MobileWebBridge/issues/1)）。
+- JS、iOS、Android 与 Demo 同步至 `0.2.0`，Demo 构建号 10；没有新增桥接接口或改变插件协议。分发状态见[版本说明](docs/versioning.md)。
+
 ## 0.1.9 — 2026-11-19
 
 - 修复 iOS 返回按钮、导航闭包和内置 DSBridge 的编译警告，使 CocoaPods 本地严格校验通过；保留既有返回与桥接行为。

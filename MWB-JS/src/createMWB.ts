@@ -1,14 +1,14 @@
-import { assembleMWB, type MWBPlugin, type MWBSDK, type MWBPartialSDK } from "./assembleMWB";
-import { attachNativePlugins, hasNativePlugin, type MWBNativePlugin, type NativePluginNamespaces } from "./nativePlugins";
-import { containerPlugin } from "./plugins/container";
-import { devicePlugin } from "./plugins/device";
-import { mediaPlugin } from "./plugins/media";
-import { storagePlugin } from "./plugins/storage";
+import { assembleMWB, type MWBPlugin, type MWBSDK, type MWBPartialSDK } from "./assembleMWB.js";
+import { attachNativePlugins, hasNativePlugin, type MWBNativePlugin, type NativePluginNamespaces } from "./nativePlugins.js";
+import { containerPlugin } from "./plugins/container.js";
+import { devicePlugin } from "./plugins/device.js";
+import { mediaPlugin } from "./plugins/media.js";
+import { storagePlugin } from "./plugins/storage.js";
 
-export type { MWBPlugin } from "./assembleMWB";
-export type { MWBSDK, MWBBasic } from "./assembleMWB";
-export { defineNativePlugin } from "./nativePlugins";
-export type { MWBNativePlugin } from "./nativePlugins";
+export type { MWBPlugin } from "./assembleMWB.js";
+export type { MWBSDK, MWBBasic } from "./assembleMWB.js";
+export { defineNativePlugin } from "./nativePlugins.js";
+export type { MWBNativePlugin } from "./nativePlugins.js";
 
 export type MWBClient = MWBSDK & { hasPlugin(name: string): Promise<boolean> };
 

@@ -1,5 +1,5 @@
 // 公共方法清单用于校验 JS、iOS 和 Android 的能力覆盖。
-import type { MWBJSSDK } from "./types";
+import type { MWBJSSDK } from "./types.js";
 
 export const apiMethods = [
   "notifyPageReady",

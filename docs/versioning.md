@@ -1,15 +1,17 @@
 # 版本、支持范围与升级
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本为 `0.1.9`，公共制品待核验。`0.1.5` 于 2026-11-09 通过 npm、Maven 公共仓库独立消费及 iOS Git Pod Release 接入验证。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前源码版本为 `0.2.0`，公共制品待核验。`0.1.5` 于 2026-11-09 通过 npm、Maven 公共仓库独立消费及 iOS Git Pod Release 接入验证。
 
 ## 当前状态
 
 | 组件 | 当前版本 | 获取方式与状态 |
 | --- | --- | --- |
-| JS SDK | `0.1.9` | 目标 npm 版本，公共制品待核验；支持本地源码构建 |
-| iOS | `0.1.9` | 通过共享 Git Tag 或本地 Pod 接入；不发布公共 CocoaPods Specs |
-| Android | `0.1.9` | 目标 Maven Central 版本，公共制品待核验；支持源码与本地 Maven |
-| Demo Web | `0.1.9` | 与本轮 SDK 配套，构建号 9 |
+| JS SDK | `0.2.0` | 目标 npm 版本，公共制品待核验；支持本地源码构建 |
+| iOS | `0.2.0` | 通过共享 Git Tag 或本地 Pod 接入；不发布公共 CocoaPods Specs |
+| Android | `0.2.0` | 目标 Maven Central 版本，公共制品待核验；支持源码与本地 Maven |
+| Demo Web | `0.2.0` | 与本轮 SDK 配套，构建号 10 |
+
+`0.2.0` 修复 TypeScript `node16` / `nodenext` 无法解析 npm 包的内部声明引用，保留 `bundler` 支持；不改变原生行为、插件协议或模块入口。
 
 `0.1.9` 修复 iOS 严格 CocoaPods 校验中的编译警告，保留现有桥接行为和两端扫码能力；没有新接口，也不改变插件协议。
 
@@ -23,7 +25,7 @@
 
 继续保留 `0.1.4` 的 iOS 默认 WebView 自动预热与可选导航绘制准备，以及既有 HTML 错误页、业务首页回调和默认星号来源配置。自动准备不代表异步业务数据已完成。
 
-安装示例固定使用 `0.1.9`。核实实时 npm 状态可运行：
+安装示例固定使用 `0.2.0`。核实实时 npm 状态可运行：
 
 ```bash
 npm view mobile-web-bridge dist-tags versions --json --registry=https://registry.npmjs.org/
@@ -35,6 +37,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | H5 SDK | iOS / Android 源码 | 插件协议 | 范围 |
 | --- | --- | --- | --- |
+| `0.2.0` | iOS / Android `0.2.0` | `1` | JS 类型声明兼容 `node16`、`nodenext` 与 `bundler`；原生接口不变 |
 | `0.1.9` | iOS / Android `0.1.9` | `1` | iOS 严格 CocoaPods 校验修复；延续扫码与现有桥接接口 |
 | `0.1.8` | iOS / Android `0.1.8` | `1` | 统一原生扫码页；Android 离线识别及系统选图 |
 | `0.1.7` | iOS / Android `0.1.7` | `1` | 延续 `0.1.6` API；iOS 可见导航栏侧滑返回无栏页时随手势淡出 |
@@ -49,6 +52,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | 共享 Git Tag | iOS Pod 版本 | Android Maven 版本 | JS npm 版本 | 状态 |
 | --- | --- | --- | --- | --- |
+| `0.2.0` | `0.2.0` | `0.2.0` | `0.2.0` | 目标版本，制品状态待核验 |
 | `0.1.9` | `0.1.9` | `0.1.9` | `0.1.9` | 目标版本，制品状态待核验 |
 | `0.1.8` | `0.1.8` | `0.1.8` | `0.1.8` | 目标版本，制品状态待核验 |
 | `0.1.7` | `0.1.7` | `0.1.7` | `0.1.7` | 目标版本，制品状态待核验 |

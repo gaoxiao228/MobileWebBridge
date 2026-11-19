@@ -1,6 +1,6 @@
-import { callAsync, callSync } from "../bridge";
-import { notifyPageReady } from "../nativePlugins";
-import type { MWBJSSDK } from "../types";
+import { callAsync, callSync } from "../bridge.js";
+import { notifyPageReady } from "../nativePlugins.js";
+import type { MWBJSSDK } from "../types.js";
 
 /** Web 容器和页面导航能力。 */
 export const containerPlugin = {

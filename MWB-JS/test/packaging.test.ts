@@ -37,8 +37,22 @@ test("packing fresh source builds an installable SDK with declarations and licen
     // SDK针对浏览器；只提供宿主全局对象，不把本次打包修复扩大为SSR支持。
     const imported = spawnSync(process.execPath, ["--input-type=module", "-e", 'globalThis.window={};Object.defineProperty(globalThis,"navigator",{value:{userAgent:"test"}});const {mwb,defineNativePlugin}=await import("mobile-web-bridge");if(mwb.basic.toast!==mwb.toast||typeof defineNativePlugin!=="function")process.exit(1)'], { cwd: consumer, encoding: "utf8" });
     expect(imported.status, imported.stderr).toBe(0);
-    writeFileSync(join(consumer, "example.ts"), 'import {mwb,createMWB,defineNativePlugin,type GenericAsyncResult} from "mobile-web-bridge";\nconst plugin=defineNativePlugin<{echo(p:{value:string}):Promise<GenericAsyncResult<string>>}>()({name:"example"});\nconst client=createMWB({plugins:[plugin]});\nclient.example.echo({value:"hello"});\nmwb.basic.getStorageSync<string>("key");\n');
-    const typed = spawnSync(process.execPath, [resolve("node_modules/typescript/lib/tsc.js"), "--noEmit", "--strict", "--skipLibCheck", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", join(consumer, "example.ts")], { cwd: consumer, encoding: "utf8" });
-    expect(typed.status, typed.stderr || typed.stdout).toBe(0);
+    // 使用 .mts 明确模拟 ESM 消费端，即使没有消费者 package.json 也不会误测为 CJS。
+    const example = join(consumer, "example.mts");
+    writeFileSync(example, `
+import { mwb, createMWB, defineNativePlugin, type GenericAsyncResult } from "mobile-web-bridge";
+const plugin = defineNativePlugin<{ echo(p: { value: string }): Promise<GenericAsyncResult<string>> }>()({ name: "example" });
+const client = createMWB({ plugins: [plugin] });
+client.example.echo({ value: "hello" });
+mwb.basic.getStorageSync<string>("key");
+
+// @ts-expect-error 若 mwb 退化成 any，这条指令将没有对应的类型错误。
+const invalidClient: symbol = mwb;
+`);
+    const compiler = resolve("node_modules/typescript/lib/tsc.js");
+    for (const [module, resolution] of [["ESNext", "Bundler"], ["Node16", "Node16"], ["NodeNext", "NodeNext"]]) {
+      const typed = spawnSync(process.execPath, [compiler, "--noEmit", "--strict", "--skipLibCheck", "false", "--target", "ES2022", "--module", module, "--moduleResolution", resolution, example], { cwd: consumer, encoding: "utf8" });
+      expect(typed.status, `${resolution}: ${typed.stderr || typed.stdout}`).toBe(0);
+    }
   } finally { rmSync(temporary, { recursive: true, force: true }); }
 }, 30000);
