@@ -1114,6 +1114,72 @@ final class NavigationTests: XCTestCase {
         XCTAssertNil(prewarmer.takeReady())
     }
 
+    func testInteractivePopFadesVisibleBarAndRestoresOrHidesIt() throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "index", withExtension: "html"))
+        let root = MWBWebViewController(configuration: .init(initialURL: url, webViewPrewarmingEnabled: false))
+        let nav = UINavigationController(rootViewController: root)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = nav
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        root.applyNavigationBarPatch(try MWBNavigationBarPatch.parse([:]), hidden: true)
+        let child = MWBWebViewController(configuration: root.configuration)
+        child.initialNavigationBarHidden = false
+        nav.pushViewController(child, animated: false)
+        let dark = UIColor(red: 18/255, green: 55/255, blue: 74/255, alpha: 1)
+        child.applyNavigationBarPatch(try MWBNavigationBarPatch.parse(["color": "#12374a"]), hidden: false)
+        XCTAssertFalse(nav.isNavigationBarHidden)
+
+        // 真实 UIKit 百分比转场暂停在各进度；检查呈现层，避免将动画终值误认为屏幕当前值。
+        func waitForTop(_ expected: MWBWebViewController) {
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                nav.topViewController === expected && nav.transitionCoordinator == nil
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed)
+        }
+        let driver = WarmInteractivePopDriver()
+        nav.delegate = driver
+        nav.popViewController(animated: true)
+        var needsCancellation = true
+        defer {
+            // 即使采样失败，也结束当前交互，避免把暂停的 UIKit 转场留给后续用例。
+            if needsCancellation { driver.interaction.cancel(); waitForTop(child) }
+            nav.delegate = nil
+        }
+        func sampleOpacity(at progress: CGFloat, until predicate: (Float) -> Bool) throws -> Float {
+            let deadline = ProcessInfo.processInfo.systemUptime + 2
+            repeat {
+                // 重申同一个手势进度，避免第一次更新早于 UIKit 安装动画时间线。
+                driver.interaction.update(progress)
+                RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+                if let opacity = nav.navigationBar.layer.presentation()?.opacity, predicate(opacity) { return opacity }
+            } while ProcessInfo.processInfo.systemUptime < deadline
+            return try XCTUnwrap(nil as Float?, "导航栏在手势进度 \(progress) 未呈现预期透明度")
+        }
+        let early = try sampleOpacity(at: 0.25) { (0.1..<0.99).contains($0) }
+        let late = try sampleOpacity(at: 0.75) { $0 < early - 0.05 }
+        _ = try sampleOpacity(at: 0.20) { $0 > late + 0.05 }
+        XCTAssertFalse(nav.isNavigationBarHidden, "拖动期间不要提前改变导航栏布局")
+        XCTAssertEqual(nav.navigationBar.standardAppearance.backgroundColor, dark)
+
+        driver.interaction.cancel()
+        needsCancellation = false
+        waitForTop(child)
+        XCTAssertFalse(nav.isNavigationBarHidden)
+        XCTAssertEqual(nav.navigationBar.alpha, 1)
+        XCTAssertEqual(nav.navigationBar.standardAppearance.backgroundColor, dark)
+
+        let completing = WarmInteractivePopDriver()
+        nav.delegate = completing
+        nav.popViewController(animated: true)
+        completing.interaction.update(0.75)
+        completing.interaction.finish()
+        waitForTop(root)
+        XCTAssertTrue(nav.isNavigationBarHidden)
+        XCTAssertEqual(nav.navigationBar.alpha, 1, "下一次显示导航栏不能继承淡出透明度")
+    }
+
     func testCancelledInteractivePopRestoresPrewarmingEligibility() throws {
         // 用 UIKit 真实百分比转场触发取消生命周期，不手工调用 didAppear 来替代取消。
         let prewarmer = MWBWebViewPrewarmer.shared
