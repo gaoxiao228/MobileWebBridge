@@ -1,14 +1,14 @@
 # 版本、支持范围与升级
 
-正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。本轮目标版本为 `0.2.1`，公开制品状态待核验。
+正式仓库：[gaoxiao228/MobileWebBridge](https://github.com/gaoxiao228/MobileWebBridge)。当前发布版本为 `0.2.1`；npm 与 Maven Central 已于 2026-11-23 通过公共仓库独立消费验证。
 
 ## 当前状态
 
 | 组件 | 当前版本 | 获取方式与状态 |
 | --- | --- | --- |
-| JS SDK | `0.2.1` | npm：`mobile-web-bridge@0.2.1`；待公开验证 |
+| JS SDK | `0.2.1` | npm：`mobile-web-bridge@0.2.1`；公共安装、完整性和类型验证通过 |
 | iOS | `0.2.1` | 通过共享 Git Tag 或本地 Pod 接入；不发布公共 CocoaPods Specs |
-| Android | `0.2.1` | Maven Central：`io.github.gaoxiao228:mobile-web-bridge:0.2.1`；待公开验证 |
+| Android | `0.2.1` | Maven Central：`io.github.gaoxiao228:mobile-web-bridge:0.2.1`；公共制品及独立 Release 消费验证通过 |
 | Demo Web | `0.2.1` | 与本轮 SDK 配套，构建号 11 |
 
 `0.2.1` 修复 iOS 导航栏显隐转场和交互返回布局，不改变公开接口或插件协议。
@@ -53,7 +53,7 @@ npm view mobile-web-bridge dist-tags versions --json --registry=https://registry
 
 | 共享 Git Tag | iOS Pod 版本 | Android Maven 版本 | JS npm 版本 | 状态 |
 | --- | --- | --- | --- | --- |
-| `0.2.1` | `0.2.1` | `0.2.1` | `0.2.1` | 本轮目标；分发状态待核验 |
+| `0.2.1` | `0.2.1` | `0.2.1` | `0.2.1` | GitHub Tag 已公开；npm 和 Maven Central 独立消费验证通过 |
 | `0.2.0` | `0.2.0` | `0.2.0` | `0.2.0` | GitHub Tag、npm 与 Maven Central 已公开；npm 和 Maven Central 独立消费验证通过 |
 | `0.1.9` | `0.1.9` | `0.1.9` | `0.1.9` | 目标版本，制品状态待核验 |
 | `0.1.8` | `0.1.8` | `0.1.8` | `0.1.8` | 目标版本，制品状态待核验 |

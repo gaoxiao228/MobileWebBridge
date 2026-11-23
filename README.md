@@ -2,7 +2,7 @@
 
 Mobile Web Bridge 是一套基于 DSBridge 的移动端 Web 容器与 JavaScript SDK，帮助开发者在自己的 iOS、Android App 中快速接入 H5 页面，并让 H5 使用原生能力。
 
-本轮目标版本为 **0.2.1**，修复 iOS 在有栏与无栏页面之间转场时的导航栏显示及侧滑返回布局跳动。未新增桥接接口，Android 原生行为不变。公开制品状态见[版本说明](docs/versioning.md)，也可按下文从源码接入。
+当前发布版本为 **0.2.1**，修复 iOS 在有栏与无栏页面之间转场时的导航栏显示及侧滑返回布局跳动。未新增桥接接口，Android 原生行为不变。npm 与 Maven Central 制品均已通过公开安装验证，iOS 使用同名 Git Tag 接入。详情见[版本说明](docs/versioning.md)，也可按下文从源码接入。
 
 iOS 提供 Swift 编写的 `MWBWebViewController`，Android 提供 Kotlin 编写的 `MWBActivity`，H5 使用统一的 TypeScript/JavaScript API。接入方可以复用现有容器和基础能力，也可以把自己的网络、账号、支付等 App 逻辑封装成原生插件，组合到 JS SDK 中供页面调用。
 
