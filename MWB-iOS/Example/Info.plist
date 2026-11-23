@@ -4,9 +4,9 @@
 <dict>
     <!-- Demo 版本与本轮 SDK 源码版本一致。 -->
     <key>CFBundleShortVersionString</key>
-    <string>0.2.0</string>
+    <string>0.2.1</string>
     <key>CFBundleVersion</key>
-    <string>10</string>
+    <string>11</string>
     <!-- iOS 27 使用 SceneDelegate 创建示例应用的主窗口。 -->
     <key>UIApplicationSceneManifest</key>
     <dict>

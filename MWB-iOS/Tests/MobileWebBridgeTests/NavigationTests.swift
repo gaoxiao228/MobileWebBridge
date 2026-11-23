@@ -1183,6 +1183,314 @@ final class NavigationTests: XCTestCase {
         XCTAssertEqual(nav.navigationBar.alpha, 1, "下一次显示导航栏不能继承淡出透明度")
     }
 
+    func testOpaquePushToHiddenBarPreservesSourceAndLayout() throws {
+        let (window, nav, root) = try readyNavigationContext()
+        defer { window.isHidden = true; MWBWebViewPrewarmer.shared.discard() }
+        nav.navigationBar.isTranslucent = false
+        let source = MWBWebViewController(configuration: root.configuration)
+        source.initialNavigationBarHidden = false
+        source.title = "来源页"
+        nav.pushViewController(source, animated: false)
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            source.loadState == .loaded && nav.transitionCoordinator == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 5), .completed)
+        source.applyNavigationBarPatch(try MWBNavigationBarPatch.parse(["color": "#12374a"]), hidden: false)
+        window.layoutIfNeeded()
+        let sourceColor = UIColor(red: 18/255, green: 55/255, blue: 74/255, alpha: 1)
+        let sourceSubviews = source.view.subviews
+        let sourceWeb = try XCTUnwrap(source.webView)
+        func top(_ view: UIView) -> CGFloat { view.convert(view.bounds, to: window).minY }
+        let sourceTop = top(sourceWeb)
+        let navTop = top(nav.view)
+
+        // 使用系统默认 push，而不是手动调用生命周期或替换动画控制器。
+        let target = PushAppearanceObserver(configuration: root.configuration)
+        target.initialNavigationBarHidden = true
+        target.configureInitialNavigationBar(try MWBNavigationBarPatch.parse(["color": "#a02030"], strict: true))
+        let duringPush = expectation(description: "真实 push 协调器开始动画")
+        var targetSafeTop: CGFloat?
+        target.onWillAppear = {
+            guard let transition = target.transitionCoordinator else {
+                XCTFail("默认动画 push 应有真实转场协调器")
+                duringPush.fulfill()
+                return
+            }
+            XCTAssertTrue(transition.isAnimated)
+            XCTAssertFalse(transition.isInteractive)
+            XCTAssertTrue(transition.viewController(forKey: .from) === source)
+            XCTAssertTrue(nav.isNavigationBarHidden, "目标页不能为真实栏预留位置")
+            guard let overlay = source.view.subviews.first(where: { !sourceSubviews.contains($0) }) else {
+                XCTFail("真实栏隐藏时来源页仍可见，必须保留它的导航栏快照")
+                duringPush.fulfill()
+                return
+            }
+            XCTAssertTrue(transition.animate(alongsideTransition: { _ in
+                XCTAssertFalse(overlay.isUserInteractionEnabled)
+                XCTAssertTrue(overlay.accessibilityElementsHidden)
+                XCTAssertEqual(overlay.alpha, 1)
+                XCTAssertEqual(overlay.subviews.first?.backgroundColor, sourceColor, "不能提前换成目标页的颜色")
+                XCTAssertEqual(top(overlay), navTop, accuracy: 1, "应覆盖状态栏背后的区域")
+                XCTAssertEqual(top(sourceWeb), sourceTop, accuracy: 1, "来源内容不应突然上移")
+                if let targetWeb = target.webView {
+                    XCTAssertEqual(top(targetWeb), navTop, accuracy: 1)
+                    targetSafeTop = targetWeb.safeAreaInsets.top
+                }
+                duringPush.fulfill()
+            }))
+        }
+        defer { target.onWillAppear = nil }
+        nav.pushViewController(target, animated: true)
+        wait(for: [duringPush], timeout: 5)
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            nav.topViewController === target && nav.transitionCoordinator == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed)
+        XCTAssertTrue(nav.isNavigationBarHidden)
+        XCTAssertEqual(source.view.subviews, sourceSubviews, "动画结束后应移除临时快照")
+        XCTAssertNotNil(targetSafeTop, "需要测到真正转场中的目标页安全区")
+        if let targetSafeTop {
+            XCTAssertEqual(try XCTUnwrap(target.webView).safeAreaInsets.top,
+                           targetSafeTop, accuracy: 1, "目标顶部安全区在动画结束后不能跳动")
+        }
+        XCTAssertTrue(nav.popViewController(animated: true) === target)
+        let returned = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            nav.topViewController === source && nav.transitionCoordinator == nil && !nav.isNavigationBarHidden
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 5), .completed)
+        XCTAssertEqual(nav.navigationBar.standardAppearance.backgroundColor, sourceColor)
+    }
+
+    func testOpaqueInteractivePopKeepsDestinationGeometryAndRestoresSourceOnCancel() throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "navigation-theme", withExtension: "html"))
+        let target = MWBWebViewController(configuration: .init(initialURL: url, webViewPrewarmingEnabled: false))
+        let nav = UINavigationController(rootViewController: target)
+        nav.navigationBar.isTranslucent = false
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = nav
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        target.applyNavigationBarPatch(try MWBNavigationBarPatch.parse([:]), hidden: true)
+        window.layoutIfNeeded()
+        let targetWeb = try XCTUnwrap(target.webView)
+        func top(_ view: UIView) -> CGFloat { view.convert(.zero, to: nav.view).y }
+        func safeTop(_ view: UIView) -> CGFloat { top(view) + view.safeAreaInsets.top }
+        let targetTop = top(targetWeb)
+        let targetSafeTop = safeTop(targetWeb)
+
+        let source = MWBWebViewController(configuration: target.configuration)
+        source.initialNavigationBarHidden = false
+        nav.pushViewController(source, animated: false)
+        // 初始 H5 会刷新页面级按钮，等它加载完再配置待验证的来源样式。
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            target.loadState == .loaded && source.loadState == .loaded
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+
+        source.applyNavigationBarPatch(try MWBNavigationBarPatch.parse([
+            "color": "#12374a", "title": "任务库", "buttonColor": "#ffffff", "backButtonStyle": "arrowText"
+        ]), hidden: false)
+        source.configureNavigationAction(title: "新建任务", ext: "add")
+        window.layoutIfNeeded()
+        let sourceWeb = try XCTUnwrap(source.webView)
+        let sourceTop = top(sourceWeb)
+        let sourceColor = nav.navigationBar.standardAppearance.backgroundColor
+        let barTop = top(nav.navigationBar)
+        let navigationTop = nav.view.bounds.minY
+        XCTAssertGreaterThan(barTop, navigationTop, "测试设备的导航栏上方应有可见的状态栏区域")
+        let sourceButtonColor = nav.navigationBar.tintColor
+        let actionItem = try XCTUnwrap(source.navigationItem.rightBarButtonItem)
+        let sourceSubviews = source.view.subviews.count
+        XCTAssertGreaterThan(sourceTop, targetTop, "不透明栏下的来源页应实际占据不同的布局")
+
+        func waitForTop(_ expected: MWBWebViewController) {
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                nav.topViewController === expected && nav.transitionCoordinator == nil
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed)
+        }
+        for attempt in 0..<3 {
+            let driver = WarmInteractivePopDriver()
+            nav.delegate = driver
+            nav.popViewController(animated: true)
+            // UIKit 可能在第一次 update 后才安装动画时间线；按进度采样真实的呈现层。
+            for progress: CGFloat in attempt == 0 ? [0.25, 0.75, 0.2] : [0.55] {
+                let deadline = ProcessInfo.processInfo.systemUptime + 2
+                let width = nav.view.bounds.width
+                var visibleX: CGFloat = 0
+                repeat {
+                    driver.interaction.update(progress)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+                    visibleX = source.view.layer.presentation()?.transform.m41 ?? 0
+                    if abs(visibleX - width * progress) < width * 0.15 { break }
+                } while ProcessInfo.processInfo.systemUptime < deadline
+                XCTAssertLessThan(abs(visibleX - width * progress), width * 0.15, "来源页应移动到手势进度")
+                XCTAssertTrue(nav.isNavigationBarHidden, "真实栏不能继续占据目标页顶部")
+                XCTAssertEqual(top(targetWeb), targetTop, accuracy: 1, "目标 WebView 拖动中不应下移")
+                XCTAssertEqual(safeTop(targetWeb), targetSafeTop, accuracy: 1, "目标顶部安全区应与静止时一致")
+                XCTAssertEqual(top(sourceWeb), sourceTop, accuracy: 1, "来源 H5 不应在快照下突然上移")
+                let overlay = source.view.subviews.count > sourceSubviews ? source.view.subviews.last : nil
+                XCTAssertEqual(source.view.subviews.count, sourceSubviews + 1)
+                XCTAssertEqual(overlay?.isUserInteractionEnabled, false)
+                XCTAssertEqual(overlay?.isAccessibilityElement, false)
+                XCTAssertEqual(overlay?.accessibilityElementsHidden, true)
+                // 状态栏背景必须和标题栏在同一个退场视图内，且不改变目标页布局。
+                let backdrop = overlay?.subviews.first
+                XCTAssertEqual(backdrop?.backgroundColor, sourceColor, "侧滑时保留来源页的状态栏底色")
+                XCTAssertEqual(backdrop.map(top) ?? .infinity, navigationTop, accuracy: 1)
+                XCTAssertEqual(backdrop?.bounds.height ?? 0, barTop - navigationTop, accuracy: 1)
+                // 栏和状态栏底色整体保持不透明，避免拖动或反拖时透出黑色转场底。
+                let opacity = overlay?.layer.presentation()?.opacity ?? -1
+                XCTAssertEqual(opacity, 1, accuracy: 0.001, "手势进度 \(progress) 时应保持原色")
+            }
+            if attempt < 2 {
+                // 目标页主题更新必须缓存，不能在拖动中重新显示共享栏。
+                if attempt == 0 {
+                    target.applyNavigationBarPatch(try MWBNavigationBarPatch.parse(["color": "#3c5350"]), hidden: false)
+                    XCTAssertTrue(nav.isNavigationBarHidden)
+                    target.applyNavigationBarPatch(try MWBNavigationBarPatch.parse([:]), hidden: true)
+                }
+                driver.interaction.cancel()
+                waitForTop(source)
+                XCTAssertFalse(nav.isNavigationBarHidden)
+                XCTAssertEqual(nav.navigationBar.standardAppearance.backgroundColor, sourceColor)
+                XCTAssertEqual(nav.navigationBar.tintColor, sourceButtonColor)
+                XCTAssertEqual(nav.navigationBar.alpha, 1)
+                XCTAssertTrue(source.navigationItem.rightBarButtonItem === actionItem)
+                let backButton = try XCTUnwrap(source.navigationItem.leftBarButtonItem?.customView as? UIButton)
+                XCTAssertEqual(backButton.accessibilityLabel, "返回")
+                XCTAssertTrue(backButton.isEnabled)
+            } else {
+                driver.interaction.finish()
+                waitForTop(target)
+                XCTAssertTrue(nav.isNavigationBarHidden)
+                XCTAssertEqual(safeTop(targetWeb), targetSafeTop, accuracy: 1)
+            }
+            XCTAssertFalse(nav.navigationBar.isTranslucent)
+            XCTAssertEqual(source.view.subviews.count, sourceSubviews, "每次转场都应移除自己的快照")
+        }
+    }
+
+    func testInteractivePopRevealsDestinationBarWithPage() throws {
+        try assertInteractivePopLayout(translucent: false)
+    }
+
+    func testInteractivePopPreservesTranslucentPageContentPosition() throws {
+        // Demo 默认使用半透明系统栏；同样验证拖动、回拖、取消和完成。
+        try assertInteractivePopLayout(translucent: true)
+    }
+
+    private func assertInteractivePopLayout(translucent: Bool) throws {
+        let (window, nav, root) = try readyNavigationContext()
+        defer { window.isHidden = true; MWBWebViewPrewarmer.shared.discard() }
+        nav.navigationBar.isTranslucent = translucent
+        let target = MWBWebViewController(configuration: root.configuration)
+        // 使用录屏中的 H5 页面，它直接读取 CSS env(safe-area-inset-top)。
+        target.initialPageOverride = root.configuration.initialURL.deletingLastPathComponent().appendingPathComponent("navigation-theme.html")
+        target.initialNavigationBarHidden = false
+        nav.pushViewController(target, animated: false)
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            target.loadState == .loaded && nav.transitionCoordinator == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 5), .completed)
+        try target.applyNavigationBarPatch(MWBNavigationBarPatch.parse([
+            "color": "#12374a", "title": "返回目标", "backButtonStyle": "arrowText"
+        ]), hidden: false)
+        window.layoutIfNeeded()
+        let targetWeb = try XCTUnwrap(target.webView)
+        let targetSubviews = target.view.subviews
+        let color = nav.navigationBar.standardAppearance.backgroundColor
+        func top(_ view: UIView) -> CGFloat { view.convert(view.bounds, to: window).minY }
+        let targetTop = top(targetWeb)
+        let targetSafeTop = targetWeb.safeAreaInsets.top
+        // 屏幕上的正文原点还取决于滚动偏移，而不只是 WebView 的外框。
+        func contentTop() -> CGFloat { targetWeb.scrollView.convert(.zero, to: window).y }
+        func firstRowTop() throws -> CGFloat {
+            let done = expectation(description: "读取页面首行实际位置")
+            var result: NSNumber?
+            targetWeb.evaluateJavaScript("document.querySelector('.theme-page-top').getBoundingClientRect().top") { value, error in
+                XCTAssertNil(error); result = value as? NSNumber; done.fulfill()
+            }
+            wait(for: [done], timeout: 3)
+            return CGFloat(try XCTUnwrap(result).doubleValue)
+        }
+        let restingContentTop = contentTop()
+        let restingRowTop = try firstRowTop()
+        let barTop = top(nav.navigationBar)
+        let navTop = top(nav.view)
+        XCTAssertGreaterThan(barTop, navTop)
+
+        func waitForTop(_ expected: UIViewController) {
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                nav.topViewController === expected && nav.transitionCoordinator == nil
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed)
+        }
+        let source = MWBWebViewController(configuration: target.configuration)
+        source.initialNavigationBarHidden = true
+        nav.pushViewController(source, animated: true)
+        waitForTop(source)
+        XCTAssertTrue(nav.isNavigationBarHidden)
+        let sourceWeb = try XCTUnwrap(source.webView)
+        let sourceTop = top(sourceWeb)
+        let sourceSafeTop = sourceWeb.safeAreaInsets.top
+        let width = window.bounds.width
+
+        for completes in [false, true] {
+            let driver = WarmInteractivePopDriver(destinationParallax: true)
+            nav.delegate = driver
+            nav.popViewController(animated: true)
+            var needsCancellation = true
+            defer {
+                if needsCancellation { driver.interaction.cancel(); waitForTop(source) }
+                nav.delegate = nil
+            }
+            for progress in [CGFloat(0.2), 0.7, 0.25] {
+                let deadline = ProcessInfo.processInfo.systemUptime + 2
+                repeat {
+                    driver.interaction.update(progress)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+                    let sourceX = source.view.layer.presentation()?.transform.m41 ?? 0
+                    if abs(sourceX - width * progress) < width * 0.13 { break }
+                } while ProcessInfo.processInfo.systemUptime < deadline
+                let sourceX = source.view.layer.presentation()?.transform.m41 ?? 0
+                XCTAssertEqual(sourceX, width * progress, accuracy: width * 0.13)
+                XCTAssertEqual(nav.navigationBar.layer.presentation()?.opacity ?? 1, 0, accuracy: 0.001,
+                               "共享栏不能盖住尚未滑走的无栏页")
+                let overlay = try XCTUnwrap(target.view.subviews.first(where: { !targetSubviews.contains($0) }),
+                                            "导航栏应随目标页露出，而不是铺在两页上方")
+                XCTAssertEqual(overlay.subviews.first?.backgroundColor, color)
+                XCTAssertEqual(top(overlay), navTop, accuracy: 1)
+                XCTAssertFalse(overlay.isUserInteractionEnabled)
+                XCTAssertTrue(overlay.accessibilityElementsHidden)
+                XCTAssertEqual(top(sourceWeb), sourceTop, accuracy: 1)
+                XCTAssertEqual(sourceWeb.safeAreaInsets.top, sourceSafeTop, accuracy: 1)
+                XCTAssertEqual(try firstRowTop(), restingRowTop, accuracy: 1)
+                XCTAssertEqual(contentTop(), restingContentTop, accuracy: 1)
+                XCTAssertEqual(top(targetWeb), targetTop, accuracy: 1)
+                XCTAssertEqual(targetWeb.safeAreaInsets.top, targetSafeTop, accuracy: 1)
+            }
+            if completes { driver.interaction.finish() } else { driver.interaction.cancel() }
+            needsCancellation = false
+            waitForTop(completes ? target : source)
+            XCTAssertEqual(nav.isNavigationBarHidden, !completes)
+            XCTAssertEqual(nav.navigationBar.alpha, 1)
+            XCTAssertEqual(target.view.subviews, targetSubviews, "转场收尾应清理临时导航栏")
+            if completes {
+                XCTAssertEqual(try firstRowTop(), restingRowTop, accuracy: 1)
+                XCTAssertEqual(contentTop(), restingContentTop, accuracy: 1)
+                XCTAssertEqual(top(targetWeb), targetTop, accuracy: 1)
+                XCTAssertEqual(targetWeb.safeAreaInsets.top, targetSafeTop, accuracy: 1)
+                XCTAssertEqual(nav.navigationBar.standardAppearance.backgroundColor, color)
+                XCTAssertEqual(target.navigationItem.leftBarButtonItem?.customView?.accessibilityLabel, "返回")
+            } else {
+                XCTAssertEqual(top(sourceWeb), sourceTop, accuracy: 1)
+                XCTAssertEqual(sourceWeb.safeAreaInsets.top, sourceSafeTop, accuracy: 1)
+            }
+        }
+    }
+
     func testCancelledInteractivePopRestoresPrewarmingEligibility() throws {
         // 用 UIKit 真实百分比转场触发取消生命周期，不手工调用 didAppear 来替代取消。
         let prewarmer = MWBWebViewPrewarmer.shared
@@ -1623,9 +1931,21 @@ private final class WarmNavigationObserver: NSObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finished() }
 }
 
+// 在 UIKit 调用真实生命周期时采样，不依赖模拟器转场速度或固定等待时长。
+private final class PushAppearanceObserver: MWBWebViewController {
+    var onWillAppear: (() -> Void)?
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        onWillAppear?()
+    }
+}
+
 // 测试使用 UIKit 真正的交互转场协调器，覆盖取消后 controller 的外观生命周期。
 private final class WarmInteractivePopDriver: NSObject, UINavigationControllerDelegate, UIViewControllerAnimatedTransitioning {
     let interaction = UIPercentDrivenInteractiveTransition()
+    private let destinationParallax: Bool
+    init(destinationParallax: Bool = false) { self.destinationParallax = destinationParallax }
     func navigationController(_ navigationController: UINavigationController, animationControllerFor operation: UINavigationController.Operation,
                               from fromVC: UIViewController, to toVC: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         operation == .pop ? self : nil
@@ -1639,8 +1959,12 @@ private final class WarmInteractivePopDriver: NSObject, UINavigationControllerDe
         let from = context.view(forKey: .from)!
         let to = context.view(forKey: .to)!
         context.containerView.insertSubview(to, belowSubview: from)
+        let width = context.containerView.bounds.width
+        // 模拟系统手势中的目标页视差，验证顶部展示跟随同一个视图。
+        if destinationParallax { to.transform = CGAffineTransform(translationX: -width * 0.3, y: 0) }
         UIView.animate(withDuration: transitionDuration(using: context), animations: {
-            from.transform = CGAffineTransform(translationX: context.containerView.bounds.width, y: 0)
+            from.transform = CGAffineTransform(translationX: width, y: 0)
+            to.transform = .identity
         }, completion: { _ in
             from.transform = .identity
             context.completeTransition(!context.transitionWasCancelled)

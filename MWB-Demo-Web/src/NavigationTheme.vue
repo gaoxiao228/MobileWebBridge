@@ -162,7 +162,7 @@ async function openNewContainer(replace = false) {
     <header class="theme-heading">
       <h1>导航栏样式</h1>
       <p>默认隐藏导航栏；取消下方隐藏选项并应用，即可预览手机顶部的原生样式。</p>
-      <p v-if="platform === 'ios'">从无导航栏的主示例页进入后，显示并应用默认深色栏，再从屏幕左边缘慢慢向右拖动。导航栏会随手势淡出，拖回取消时会恢复。</p>
+      <p v-if="platform === 'ios'">从无导航栏的主示例页进入后，显示并应用默认深色栏，再从屏幕左边缘慢慢向右拖动。观察导航栏随手势退场；拖回取消时会恢复。</p>
     </header>
 
     <form class="theme-form" @submit.prevent="applyTheme">

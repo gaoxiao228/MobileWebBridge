@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.2.1 — 2026-11-23
+
+- 修复 iOS 在有栏、无栏页面间切换时导航栏短暂变黑、侧滑返回时导航栏提前出现以及正文顶部跳动；取消手势时恢复原页。
+- JS、iOS、Android 与 Demo 配套版本为 `0.2.1`，Demo 构建号 11；公开接口与插件协议不变。分发状态见[版本说明](docs/versioning.md)。
+
 ## 0.2.0 — 2026-11-19
 
 - 修复 npm 包在 TypeScript `node16` / `nodenext` 模式下无法导入公开类型、`mwb` 退化为 `any` 的问题；保留 `bundler` 支持（[#1](https://github.com/gaoxiao228/MobileWebBridge/issues/1)）。

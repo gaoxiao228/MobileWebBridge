@@ -7,7 +7,7 @@ plugins {
 
 // 坐标须先通过 Central 命名空间认证；配置存在不代表已经公开发布。
 group = "io.github.gaoxiao228"
-version = providers.gradleProperty("mwbVersion").getOrElse("0.2.0")
+version = providers.gradleProperty("mwbVersion").getOrElse("0.2.1")
 
 android {
     namespace = "com.mobilewebbridge"

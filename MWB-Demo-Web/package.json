@@ -1,6 +1,6 @@
 {
   "name": "mwb-demo-web",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Mobile Web Bridge 的 H5 方法示例与静态测试页",

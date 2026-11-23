@@ -224,7 +224,7 @@ SOFTWARE.
   var import_dsbridge = __toESM(require_dsbridge(), 1);
 
   // src/types.ts
-  var version = "0.2.0";
+  var version = "0.2.1";
 
   // src/eventHub.ts
   var hubs = /* @__PURE__ */ new WeakMap();

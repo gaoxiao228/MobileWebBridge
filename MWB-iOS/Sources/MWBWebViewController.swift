@@ -133,7 +133,8 @@ open class MWBWebViewController: UIViewController {
     var initialPageOverride: URL?
     var initialNavigationBarHidden: Bool?
     private var navigationBarState: MWBNavigationBarSnapshot?
-    private var defersNavigationBarRestore = false
+    private var navigationBarRestoreOwner: NSObject?
+    private var navigationBarReturnPreview: (view: UIView, navigationSize: CGSize, traits: UITraitCollection, safeTop: CGFloat)?
     private var navigationStyle: MWBNavigationBarAppearance
     private var initialNavigationPatch: MWBNavigationBarPatch?
     private var navigationShowBackButton: Bool?
@@ -248,7 +249,8 @@ open class MWBWebViewController: UIViewController {
         host?.configureContainer(self)
         if let patch = initialNavigationPatch {
             initialNavigationPatch = nil
-            applyNavigationBarPatch(patch)
+            // 冷启动目标可能已是栈顶；首个 appearance 前不能先覆盖来源页的共享栏。
+            applyNavigationBarPatch(patch, restoreSharedBar: false)
         }
         // configureContainer 可重入取消任务；取消后不能再启动初始加载。
         guard !abandonedNavigationPreparation else { return }
@@ -349,36 +351,170 @@ open class MWBWebViewController: UIViewController {
         if let navigation = navigationController {
             // 只有真实入栈的目标才启用隔离；离屏准备、取消和失败都不修改宿主标志。
             if usesIsolatedAppearance, navigation.topViewController === self { navigation.mwbNavigationState.isolated = true }
-            if !fadeNavigationBarForInteractivePop(in: navigation) {
+            if !revealNavigationBarDuringInteractivePop(in: navigation), !transitionNavigationBarToHidden(in: navigation) {
                 navigationBarState?.restore(navigation)
             }
         }
         configureBackButton()
     }
 
-    private func fadeNavigationBarForInteractivePop(in navigation: UINavigationController) -> Bool {
-        guard navigationBarState?.hidden == true, !navigation.isNavigationBarHidden,
-              let transition = transitionCoordinator, transition.isInteractive,
+    private func revealNavigationBarDuringInteractivePop(in navigation: UINavigationController) -> Bool {
+        if navigationBarRestoreOwner != nil { return true }
+        guard let targetState = navigationBarState, !targetState.hidden, navigation.isNavigationBarHidden,
+              let transition = transitionCoordinator, transition.isAnimated, transition.isInteractive,
               transition.viewController(forKey: .to) === self,
               let source = transition.viewController(forKey: .from),
-              !navigation.viewControllers.contains(where: { $0 === source }) else { return false }
+              !navigation.viewControllers.contains(where: { $0 === source }),
+              let preview = navigationBarReturnPreview, preview.navigationSize == navigation.view.bounds.size,
+              !traitCollection.hasDifferentColorAppearance(comparedTo: preview.traits) else { return false }
 
-        // 栏仍占据原来的布局；只让 UIKit 随手势改变透明度，取消时可以反向播放。
+        let sourceState = MWBNavigationBarSnapshot(navigation)
         let bar = navigation.navigationBar
         let originalAlpha = bar.alpha
-        defersNavigationBarRestore = true
+        let overlay = preview.view
+        var topCompensation: CGFloat = 0
+        let queued = transition.animate(alongsideTransition: { [weak self] _ in
+            guard let self, self.navigationBarRestoreOwner === overlay else { return }
+            // 用离开目标页前已渲染的快照；真实栏只负责布局，不能盖到前景页。
+            self.view.addSubview(overlay)
+            UIView.performWithoutAnimation {
+                bar.alpha = 0
+                navigation.view.layoutIfNeeded()
+                // 半透明栏在手势期间尚未计入目标页安全区，按离开前的实测值补足差额。
+                topCompensation = max(0, preview.safeTop - self.view.safeAreaInsets.top)
+                if topCompensation > 0 {
+                    self.additionalSafeAreaInsets.top += topCompensation
+                    self.view.layoutIfNeeded()
+                }
+            }
+        }, completion: { [weak self, weak navigation, weak source] context in
+            defer { overlay.removeFromSuperview() }
+            guard let self, self.navigationBarRestoreOwner === overlay else { return }
+            self.navigationBarRestoreOwner = nil
+            UIView.performWithoutAnimation {
+                if let navigation {
+                    if context.isCancelled, let source, navigation.topViewController === source {
+                        sourceState.restore(navigation)
+                    } else if !context.isCancelled, navigation.topViewController === self {
+                        self.navigationBarState?.restore(navigation)
+                    }
+                }
+                // 只撤销本次补偿，完成和取消均保留宿主自己的额外安全区。
+                if topCompensation > 0 { self.additionalSafeAreaInsets.top -= topCompensation }
+                bar.alpha = originalAlpha
+            }
+        })
+        guard queued else { return false }
+        navigationBarRestoreOwner = overlay
+        // 先让 UIKit 在自己的转场事务中决定目标布局，再切换视觉层。
+        targetState.restore(navigation)
+        return true
+    }
+
+    private func transitionNavigationBarToHidden(in navigation: UINavigationController) -> Bool {
+        if navigationBarRestoreOwner != nil { return true }
+        guard navigationBarState?.hidden == true, !navigation.isNavigationBarHidden,
+              let transition = transitionCoordinator, transition.isAnimated,
+              transition.viewController(forKey: .to) === self,
+              let source = transition.viewController(forKey: .from) else { return false }
+
+        if transition.isInteractive {
+            // 只接管已从栈中移除的来源页，保留原有交互式 pop 行为。
+            guard !navigation.viewControllers.contains(where: { $0 === source }) else { return false }
+            if !navigation.navigationBar.isTranslucent,
+               moveOpaqueNavigationBarWithSource(in: navigation, source: source, transition: transition) {
+                return true
+            }
+            return fadeNavigationBarForInteractivePop(in: navigation, transition: transition)
+        }
+
+        // 向前打开时，来源仍紧邻目标下方。记住此刻的外观，供之后的边缘返回使用。
+        guard navigation.topViewController === self, navigation.viewControllers.dropLast().last === source,
+              let sourceView = source.viewIfLoaded,
+              let overlay = makeNavigationBarOverlay(in: navigation, page: sourceView) else { return false }
+        if let source = source as? MWBWebViewController {
+            source.navigationBarReturnPreview = (overlay, navigation.view.bounds.size, source.traitCollection, sourceView.safeAreaInsets.top)
+        }
+        // 半透明栏保留原来的 push 转场，只保存显示快照。
+        guard !navigation.navigationBar.isTranslucent else { return false }
+        return moveOpaqueNavigationBarWithSource(in: navigation, source: source, transition: transition, overlay: overlay)
+    }
+
+    private func fadeNavigationBarForInteractivePop(in navigation: UINavigationController,
+                                                    transition: UIViewControllerTransitionCoordinator) -> Bool {
+        let bar = navigation.navigationBar
+        // 半透明栏和无法取快照的情况仍走原来的随手势淡出。
+        let originalAlpha = bar.alpha
+        let owner = NSObject()
         let queued = transition.animateAlongsideTransition(in: navigation.view, animation: { _ in
             bar.alpha = 0
         }, completion: { [weak self, weak navigation] context in
-            self?.defersNavigationBarRestore = false
+            guard self?.navigationBarRestoreOwner === owner else { return }
+            self?.navigationBarRestoreOwner = nil
             // 成功后才提交目标页的布局；取消交给来源页原有的 appearance 恢复流程。
             if !context.isCancelled, let self, let navigation, navigation.topViewController === self {
                 self.navigationBarState?.restore(navigation)
             }
             bar.alpha = originalAlpha
         })
-        if !queued { defersNavigationBarRestore = false }
+        if queued { navigationBarRestoreOwner = owner }
         return queued
+    }
+
+    private func moveOpaqueNavigationBarWithSource(in navigation: UINavigationController, source: UIViewController,
+                                                    transition: UIViewControllerTransitionCoordinator,
+                                                    overlay preparedOverlay: UIView? = nil) -> Bool {
+        guard let sourceView = source.viewIfLoaded,
+              let overlay = preparedOverlay ?? makeNavigationBarOverlay(in: navigation, page: sourceView)
+        else { return false }
+        let sourceState = MWBNavigationBarSnapshot(navigation)
+        // 让快照随来源页滑动，保持原色；只注册完成回调，避免整组淡出透出深色转场底。
+        sourceView.addSubview(overlay)
+        let queued = transition.animate(alongsideTransition: nil, completion: { [weak self, weak navigation, weak source] context in
+            defer { overlay.removeFromSuperview() }
+            // UIKit 可能在注册失败时仍调用 completion，旧回调不得写入共享导航栏。
+            guard let self, self.navigationBarRestoreOwner === overlay else { return }
+            self.navigationBarRestoreOwner = nil
+            guard let navigation else { return }
+            if context.isCancelled, let source, navigation.topViewController === source {
+                sourceState.restore(navigation)
+            } else if !context.isCancelled, navigation.topViewController === self {
+                self.navigationBarState?.restore(navigation)
+            }
+        })
+        guard queued else { overlay.removeFromSuperview(); return false }
+        navigationBarRestoreOwner = overlay
+        // 只释放真实栏的布局占位，保留共享主题直到 UIKit 确认栈顶。
+        navigation.setNavigationBarHidden(true, animated: false)
+        return true
+    }
+
+    private func makeNavigationBarOverlay(in navigation: UINavigationController, page: UIView) -> UIView? {
+        let bar = navigation.navigationBar
+        guard let window = bar.window, page.window === window,
+              page.isDescendant(of: navigation.view), !bar.bounds.isEmpty else { return nil }
+        let barFrame = bar.convert(bar.bounds, to: page)
+        let navigationTop = navigation.view.convert(navigation.view.bounds, to: page).minY
+        let backdropHeight = max(0, barFrame.minY - navigationTop)
+        let frame = CGRect(x: barFrame.minX, y: barFrame.minY - backdropHeight,
+                           width: barFrame.width, height: barFrame.height + backdropHeight)
+        guard !page.clipsToBounds || page.bounds.contains(frame),
+              let barSnapshot = bar.snapshotView(afterScreenUpdates: false) else { return nil }
+
+        let overlay = UIView(frame: frame)
+        if backdropHeight > 0 {
+            // 只补状态栏后的底色；时间、信号和电量仍由系统绘制，不截取窗口。
+            let backdrop = UIView(frame: CGRect(x: 0, y: 0, width: barFrame.width, height: backdropHeight))
+            backdrop.backgroundColor = bar.backgroundColor ?? bar.standardAppearance.backgroundColor
+                ?? (bar.isTranslucent ? .clear : .systemBackground)
+            overlay.addSubview(backdrop)
+        }
+        barSnapshot.frame = CGRect(x: 0, y: backdropHeight, width: barFrame.width, height: barFrame.height)
+        overlay.addSubview(barSnapshot)
+        overlay.isUserInteractionEnabled = false
+        overlay.isAccessibilityElement = false
+        overlay.accessibilityElementsHidden = true
+        return overlay
     }
 
     /// 打开补丁在宿主初始化后、加载目标文档前应用；不会写来源页的共享栏。
@@ -394,17 +530,18 @@ open class MWBWebViewController: UIViewController {
         navigationBarState?.apply(navigationStyle, traits: traitCollection)
     }
 
-    func applyNavigationBarPatch(_ patch: MWBNavigationBarPatch, hidden: Bool? = nil) {
-        // 先合并自己的值，再决定是否允许接触共享 UINavigationBar。
+    func applyNavigationBarPatch(_ patch: MWBNavigationBarPatch, hidden: Bool? = nil, restoreSharedBar: Bool = true) {
+        // 样式更新后不能把离开页面时的旧外观带进下一次侧滑。
+        navigationBarReturnPreview = nil
         navigationStyle = navigationStyle.merging(patch.appearance)
         usesIsolatedAppearance = usesIsolatedAppearance || patch.enablesIsolation
         if let show = patch.showBackButton { navigationShowBackButton = show }
         if let hidden { navigationThemeHidden = hidden; navigationBarState?.hidden = hidden }
         prepareNavigationBarState()
-        if let navigation = navigationController, navigation.topViewController === self {
+        if restoreSharedBar, let navigation = navigationController, navigation.topViewController === self {
             if usesIsolatedAppearance { navigation.mwbNavigationState.isolated = true }
-            // 交互中仍保存新主题，等目标真正出现，再将最新状态应用到共享栏。
-            if !defersNavigationBarRestore { navigationBarState?.restore(navigation) }
+            // 转场中仍保存新主题，等目标真正出现，再将最新状态应用到共享栏。
+            if navigationBarRestoreOwner == nil { navigationBarState?.restore(navigation) }
         }
         configureBackButton()
         if let button = navigationItem.rightBarButtonItem { styleActionButton(button) }
@@ -472,12 +609,14 @@ open class MWBWebViewController: UIViewController {
     /// 主题方法修改当前页后更新快照，供子页返回时恢复当前页样式。
     func rememberNavigationBarState() {
         guard let navigationController else { return }
+        navigationBarReturnPreview = nil
         _ = navigationController.mwbNavigationState
         navigationBarState = .init(navigationController)
     }
 
     /// 右上角文字按钮归当前页面所有，点击时只通知当前可信网页。
     func configureNavigationAction(title: String?, ext: String?) {
+        navigationBarReturnPreview = nil
         navigationActionExt = ext
         navigationActionRevision = documentRevision
         if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -500,6 +639,8 @@ open class MWBWebViewController: UIViewController {
 
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // 已回到前台，放弃旧快照；只在页面实际被下一页覆盖期间保留它。
+        navigationBarReturnPreview = nil
         isContainerVisible = true
         hasRequestedPrewarming = false
         // didAppear 可能仍在 UIKit 转场收尾中；下一主线程机会再校验，避免漏掉已快速加载的页面。

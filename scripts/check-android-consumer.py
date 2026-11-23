@@ -65,7 +65,7 @@ def verify_publication(repository: Path, version: str) -> None:
 def main() -> None:
     """使用仓库自带 Wrapper，允许 CI 通过环境设置 JDK 17 和 Android SDK 35。"""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="0.2.0", help="候选本地发布版本")
+    parser.add_argument("--version", default="0.2.1", help="候选本地发布版本")
     parser.add_argument("--offline", action="store_true", help="仅使用已有 Gradle 缓存")
     arguments = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
